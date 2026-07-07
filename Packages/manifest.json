@@ -1,0 +1,28 @@
+{
+  "dependencies": {
+    "com.github.homuler.mediapipe": "file:com.github.homuler.mediapipe",
+    "com.youngwoocho02.unity-cli-connector": "file:com.youngwoocho02.unity-cli-connector",
+    "com.unity.ext.nunit": "file:com.unity.ext.nunit",
+    "com.unity.ide.rider": "3.0.31",
+    "com.unity.ide.visualstudio": "2.0.22",
+    "com.unity.test-framework": "file:com.unity.test-framework",
+    "com.unity.ugui": "file:com.unity.ugui",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.assetbundle": "1.0.0",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.cloth": "1.0.0",
+    "com.unity.modules.director": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0",
+    "com.unity.modules.imgui": "1.0.0",
+    "com.unity.modules.jsonserialize": "1.0.0",
+    "com.unity.modules.particlesystem": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.screencapture": "1.0.0",
+    "com.unity.modules.ui": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.modules.unitywebrequestassetbundle": "1.0.0",
+    "com.unity.modules.unitywebrequesttexture": "1.0.0",
+    "com.unity.modules.video": "1.0.0"
+  }
+}

@@ -1,0 +1,39 @@
+* text=auto
+
+# Source and config text
+*.cs text eol=lf
+*.asmdef text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.shader text eol=lf
+*.cginc text eol=lf
+*.txt text eol=lf
+*.mhclo text eol=lf
+*.mhmat text eol=lf
+*.obj text eol=lf
+
+# Unity YAML assets
+*.unity text eol=lf
+*.prefab text eol=lf
+*.asset text eol=lf
+*.meta text eol=lf
+*.mat text eol=lf
+*.controller text eol=lf
+*.anim text eol=lf
+
+# Binary assets
+*.bytes binary
+*.fbx binary
+*.blend binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.tga binary
+*.psd binary
+*.zip binary
+*.tgz binary
+*.dll binary
+*.so binary
+*.dylib binary
+*.aar binary
+*.framework binary
