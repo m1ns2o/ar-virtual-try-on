@@ -1611,12 +1611,16 @@ MonoBehaviour:
   fittingController: {fileID: 1269336790}
   showControls: 1
   colorCode: '#D94B6A'
+  stripeColorCode: '#FFFFFF'
+  stripeWidthPixels: 8
+  stripeGapPixels: 10
+  verticalStripes: 1
   controlsRect:
     serializedVersion: 2
     x: 18
     y: 296
-    width: 380
-    height: 76
+    width: 460
+    height: 112
 --- !u!1 &1280505091
 GameObject:
   m_ObjectHideFlags: 0

@@ -332,6 +332,39 @@ namespace ARCloset
             return applied;
         }
 
+        public bool ApplyCurrentGarmentTexture(Texture texture)
+        {
+            if (currentGarment == null)
+            {
+                AdoptExistingEquippedGarment();
+            }
+
+            if (currentGarment == null)
+            {
+                return false;
+            }
+
+            bool applied = false;
+            foreach (Renderer renderer in currentGarment.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Material[] materials = renderer.materials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    if (ApplyMaterialTexture(materials[i], texture))
+                    {
+                        applied = true;
+                    }
+                }
+            }
+
+            return applied;
+        }
+
         private static bool ApplyMaterialColor(Material material, Color color)
         {
             if (material == null)
@@ -348,6 +381,27 @@ namespace ARCloset
             if (material.HasProperty("_Color"))
             {
                 material.SetColor("_Color", color);
+            }
+
+            return true;
+        }
+
+        private static bool ApplyMaterialTexture(Material material, Texture texture)
+        {
+            if (material == null)
+            {
+                return false;
+            }
+
+            material.mainTexture = texture;
+            if (material.HasProperty("_BaseMap"))
+            {
+                material.SetTexture("_BaseMap", texture);
+            }
+
+            if (material.HasProperty("_MainTex"))
+            {
+                material.SetTexture("_MainTex", texture);
             }
 
             return true;

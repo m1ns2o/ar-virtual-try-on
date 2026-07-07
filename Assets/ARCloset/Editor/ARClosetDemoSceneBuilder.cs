@@ -214,6 +214,11 @@ namespace ARClosetEditor
             appearanceObject.FindProperty("fittingController").objectReferenceValue = fittingController;
             appearanceObject.FindProperty("showControls").boolValue = true;
             appearanceObject.FindProperty("colorCode").stringValue = "#D94B6A";
+            appearanceObject.FindProperty("stripeColorCode").stringValue = "#FFFFFF";
+            appearanceObject.FindProperty("stripeWidthPixels").intValue = 8;
+            appearanceObject.FindProperty("stripeGapPixels").intValue = 10;
+            appearanceObject.FindProperty("verticalStripes").boolValue = true;
+            appearanceObject.FindProperty("controlsRect").rectValue = new Rect(18f, 296f, 460f, 112f);
             appearanceObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(appearanceController);
 
