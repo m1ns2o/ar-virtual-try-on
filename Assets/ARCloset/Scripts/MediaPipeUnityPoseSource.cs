@@ -9,6 +9,7 @@ using Mediapipe.Tasks.Vision.PoseLandmarker;
 using Mediapipe.Unity;
 using Mediapipe.Unity.Experimental;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace ARCloset
 {
@@ -25,6 +26,7 @@ namespace ARCloset
         [SerializeField] private Renderer previewRenderer;
         [SerializeField] private Camera previewCamera;
         [SerializeField] private float previewPlaneDistance = 12f;
+        [SerializeField] private bool ensureRenderingCamera = true;
 
         [Header("Camera")]
         [SerializeField] private int cameraDeviceIndex;
@@ -49,8 +51,8 @@ namespace ARCloset
         [SerializeField] private float minTrackingConfidence = 0.22f;
         [SerializeField] private bool preferLiteModel = true;
         [SerializeField] private PoseInferenceBackend inferenceBackend = PoseInferenceBackend.Auto;
-        [SerializeField, Range(1, 60)] private int maxInferenceFps = 20;
-        [SerializeField, Range(1, 4)] private int cpuFrameStride = 2;
+        [SerializeField, Range(1, 60)] private int maxInferenceFps = 30;
+        [SerializeField, Range(1, 4)] private int cpuFrameStride = 1;
 
         private readonly HashSet<string> blockedDeviceNames = new(StringComparer.OrdinalIgnoreCase);
         private WebCamTexture webcamTexture;
@@ -66,9 +68,11 @@ namespace ARCloset
         private float lastFrameMean = -1f;
         private float lastFrameVariance = -1f;
         private bool useGpuInference;
+        private bool useGpuImageInput;
         private int webcamFrameCounter;
         private float nextInferenceTime;
         private string activeModelFileName = "pose_landmarker_lite.bytes";
+        private int availableCameraDeviceCount;
 
         public bool IsRunning => runCoroutine != null;
         public string Status => status;
@@ -77,6 +81,10 @@ namespace ARCloset
         private void Awake()
         {
             Application.runInBackground = true;
+            if (ensureRenderingCamera)
+            {
+                previewCamera = EnsureRenderingCamera(previewCamera);
+            }
         }
 
         private void Reset()
@@ -86,6 +94,11 @@ namespace ARCloset
 
         private void OnEnable()
         {
+            if (ensureRenderingCamera)
+            {
+                previewCamera = EnsureRenderingCamera(previewCamera);
+            }
+
             if (startOnEnable)
             {
                 StartSource();
@@ -155,6 +168,7 @@ namespace ARCloset
             mirrorPreview = mirrored;
             mirrorInput = mirrored;
             ApplyPreviewTexture();
+            FitPreviewToCamera();
         }
 
         public void StopSource()
@@ -215,14 +229,20 @@ namespace ARCloset
             }
 
             WebCamDevice[] devices = WebCamTexture.devices;
-            string deviceName = devices.Length > 0
-                ? devices[Mathf.Clamp(cameraDeviceIndex, 0, devices.Length - 1)].name
-                : null;
+            availableCameraDeviceCount = devices.Length;
+            string deviceName = null;
+            if (devices.Length > 0)
+            {
+                cameraDeviceIndex = FindUsableCameraDeviceIndex(devices, Mathf.Clamp(cameraDeviceIndex, 0, devices.Length - 1));
+                deviceName = devices[cameraDeviceIndex].name;
+            }
             activeDeviceName = string.IsNullOrEmpty(deviceName) ? "default" : deviceName;
 
             webcamTexture = string.IsNullOrEmpty(deviceName)
                 ? new WebCamTexture(requestedWidth, requestedHeight, requestedFps)
                 : new WebCamTexture(deviceName, requestedWidth, requestedHeight, requestedFps);
+            webcamTexture.wrapMode = TextureWrapMode.Clamp;
+            webcamTexture.filterMode = FilterMode.Bilinear;
             webcamTexture.Play();
 
             if (previewRenderer != null)
@@ -289,7 +309,9 @@ namespace ARCloset
                 try
                 {
                     ImageTransformationOptions transformation = GetInputTransformationOptions();
-                    string backend = useGpuInference ? "GPU" : "CPU";
+                    string backend = useGpuInference
+                        ? useGpuImageInput ? "GPU/GPU input" : "GPU/CPU input"
+                        : "CPU";
                     if (TryDetectPoseFrame(timestampMillis, transformation))
                     {
                         PushPoseResult(poseResult);
@@ -302,6 +324,15 @@ namespace ARCloset
                 }
                 catch (Exception exception)
                 {
+                    if (useGpuInference)
+                    {
+                        Debug.LogWarning($"Unity MediaPipe GPU inference failed; falling back to CPU: {exception.Message}");
+                        InitializePoseLandmarker(modelPath, false);
+                        textureFrame = new TextureFrame(webcamTexture.width, webcamTexture.height, TextureFormat.RGBA32);
+                        status = $"Unity MediaPipe GPU failed; using CPU";
+                        continue;
+                    }
+
                     status = $"Unity MediaPipe error: {exception.Message}";
                     Debug.LogWarning(status);
                 }
@@ -323,6 +354,7 @@ namespace ARCloset
         private bool SelectNextCameraDevice(string reason)
         {
             WebCamDevice[] devices = WebCamTexture.devices;
+            availableCameraDeviceCount = devices.Length;
             if (devices.Length == 0)
             {
                 status = "Unity MediaPipe no webcam devices";
@@ -334,7 +366,7 @@ namespace ARCloset
             {
                 int candidateIndex = (startIndex + i) % devices.Length;
                 string candidateName = devices[candidateIndex].name;
-                if (ShouldSkipCameraDevice(candidateName))
+                if (candidateIndex == startIndex || ShouldSkipCameraDevice(devices, candidateIndex))
                 {
                     continue;
                 }
@@ -355,6 +387,26 @@ namespace ARCloset
             return false;
         }
 
+        private int FindUsableCameraDeviceIndex(IReadOnlyList<WebCamDevice> devices, int startIndex)
+        {
+            if (devices == null || devices.Count == 0)
+            {
+                return 0;
+            }
+
+            int safeStartIndex = Mathf.Clamp(startIndex, 0, devices.Count - 1);
+            for (int i = 0; i < devices.Count; i++)
+            {
+                int candidateIndex = (safeStartIndex + i) % devices.Count;
+                if (!ShouldSkipCameraDevice(devices, candidateIndex))
+                {
+                    return candidateIndex;
+                }
+            }
+
+            return safeStartIndex;
+        }
+
         private bool ShouldSkipCameraDevice(string deviceName)
         {
             if (string.IsNullOrWhiteSpace(deviceName))
@@ -367,7 +419,60 @@ namespace ARCloset
                 return true;
             }
 
-            return deviceName.IndexOf("EOS Webcam Utility Pro", StringComparison.OrdinalIgnoreCase) >= 0;
+            if (deviceName.IndexOf("EOS Webcam Utility Pro", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            if (deviceName.IndexOf(": Integrated I", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                deviceName.IndexOf("Infrared", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                deviceName.IndexOf(" IR", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool ShouldSkipCameraDevice(IReadOnlyList<WebCamDevice> devices, int deviceIndex)
+        {
+            if (devices == null || deviceIndex < 0 || deviceIndex >= devices.Count)
+            {
+                return true;
+            }
+
+            string deviceName = devices[deviceIndex].name;
+            if (ShouldSkipCameraDevice(deviceName))
+            {
+                return true;
+            }
+
+            string normalizedName = NormalizeCameraDeviceName(deviceName);
+            for (int i = 0; i < deviceIndex; i++)
+            {
+                if (ShouldSkipCameraDevice(devices[i].name))
+                {
+                    continue;
+                }
+
+                if (string.Equals(NormalizeCameraDeviceName(devices[i].name), normalizedName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static string NormalizeCameraDeviceName(string deviceName)
+        {
+            if (string.IsNullOrWhiteSpace(deviceName))
+            {
+                return string.Empty;
+            }
+
+            int pathStart = deviceName.IndexOf("(/dev/video", StringComparison.OrdinalIgnoreCase);
+            return pathStart >= 0 ? deviceName.Substring(0, pathStart).Trim() : deviceName.Trim();
         }
 
         private void BlockActiveCameraDevice()
@@ -396,7 +501,7 @@ namespace ARCloset
 
         private void UpdateFrameHealth()
         {
-            if (!autoSwitchFlatCameraFeed || webcamTexture == null || WebCamTexture.devices.Length <= 1)
+            if (!autoSwitchFlatCameraFeed || webcamTexture == null || availableCameraDeviceCount <= 1)
             {
                 return;
             }
@@ -495,7 +600,7 @@ namespace ARCloset
         {
             ImageProcessingOptions imageOptions = new ImageProcessingOptions(rotationDegrees: 0);
 
-            if (useGpuInference)
+            if (useGpuImageInput)
             {
                 textureFrame.ReadTextureOnGPU(webcamTexture, transformation.flipHorizontally, transformation.flipVertically);
                 using Mediapipe.Image image = textureFrame.BuildGPUImage(GpuManager.GetGlContext());
@@ -510,6 +615,7 @@ namespace ARCloset
         private IEnumerator InitializeGpuIfRequested()
         {
             useGpuInference = false;
+            useGpuImageInput = false;
 
             if (!ShouldUseGpuInference())
             {
@@ -517,7 +623,8 @@ namespace ARCloset
             }
 
             yield return GpuManager.Initialize();
-            useGpuInference = GpuManager.IsInitialized && GpuManager.GpuResources != null && GpuManager.GetGlContext() != null;
+            useGpuInference = GpuManager.IsInitialized && GpuManager.GpuResources != null;
+            useGpuImageInput = useGpuInference && SupportsGpuImageInput() && GpuManager.GetGlContext() != null;
             if (!useGpuInference)
             {
                 status = "Unity MediaPipe GPU unavailable; using CPU";
@@ -526,18 +633,37 @@ namespace ARCloset
 
         private bool ShouldUseGpuInference()
         {
-            if (!SupportsGpuImageInput())
+            if (!SupportsGpuDelegate())
             {
                 return false;
             }
 
-            return inferenceBackend == PoseInferenceBackend.GPU || inferenceBackend == PoseInferenceBackend.Auto;
+            if (inferenceBackend == PoseInferenceBackend.CPU)
+            {
+                return false;
+            }
+
+            if (inferenceBackend == PoseInferenceBackend.GPU)
+            {
+                return true;
+            }
+
+            return SupportsGpuImageInput();
+        }
+
+        private static bool SupportsGpuDelegate()
+        {
+#if UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX || UNITY_ANDROID
+            return true;
+#else
+            return false;
+#endif
         }
 
         private static bool SupportsGpuImageInput()
         {
 #if UNITY_EDITOR_LINUX || UNITY_STANDALONE_LINUX || UNITY_ANDROID
-            return true;
+            return SystemInfo.graphicsDeviceType == GraphicsDeviceType.OpenGLES3;
 #else
             return false;
 #endif
@@ -621,9 +747,8 @@ namespace ARCloset
             material.mainTexture = webcamTexture;
             material.color = Color.white;
 
-            UnityEngine.Rect uvRect = GetPreviewUvRect();
-            Vector2 scale = new Vector2(uvRect.width, uvRect.height);
-            Vector2 offset = new Vector2(uvRect.x, uvRect.y);
+            Vector2 scale = Vector2.one;
+            Vector2 offset = Vector2.zero;
 
             material.mainTextureScale = scale;
             material.mainTextureOffset = offset;
@@ -662,7 +787,7 @@ namespace ARCloset
 
             if (previewCamera == null)
             {
-                previewCamera = Camera.main;
+                previewCamera = ensureRenderingCamera ? EnsureRenderingCamera(null) : Camera.main;
             }
 
             if (previewCamera == null || webcamTexture == null)
@@ -676,6 +801,7 @@ namespace ARCloset
 
             Transform target = previewRenderer.transform;
             target.rotation = previewCamera.transform.rotation * Quaternion.AngleAxis(DisplayRotationDegrees(), Vector3.forward);
+            Vector2 previewSign = GetPreviewScaleSign();
 
             if (previewCamera.orthographic)
             {
@@ -691,7 +817,7 @@ namespace ARCloset
                 }
 
                 target.position = previewCamera.transform.position + previewCamera.transform.forward * previewPlaneDistance;
-                target.localScale = new Vector3(planeWidth, planeHeight, 1f);
+                target.localScale = new Vector3(planeWidth * previewSign.x, planeHeight * previewSign.y, 1f);
                 return;
             }
 
@@ -707,7 +833,112 @@ namespace ARCloset
             }
 
             target.position = previewCamera.transform.position + previewCamera.transform.forward * previewPlaneDistance;
-            target.localScale = new Vector3(width, height, 1f);
+            target.localScale = new Vector3(width * previewSign.x, height * previewSign.y, 1f);
+        }
+
+        private Camera EnsureRenderingCamera(Camera preferredCamera)
+        {
+            Camera camera = preferredCamera != null ? preferredCamera : Camera.main;
+            if (camera == null)
+            {
+                Camera[] cameras = FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                foreach (Camera candidate in cameras)
+                {
+                    if (candidate != null && candidate.name == "Main Camera")
+                    {
+                        camera = candidate;
+                        break;
+                    }
+                }
+
+                if (camera == null && cameras.Length > 0)
+                {
+                    camera = cameras[0];
+                }
+            }
+
+            bool created = false;
+            if (camera == null)
+            {
+                GameObject cameraObject = new GameObject("Main Camera");
+                camera = cameraObject.AddComponent<Camera>();
+                created = true;
+            }
+
+            ActivateHierarchy(camera.transform);
+            camera.enabled = true;
+            camera.targetTexture = null;
+            camera.targetDisplay = 0;
+            camera.cullingMask = ~0;
+            camera.nearClipPlane = 0.1f;
+            camera.farClipPlane = Mathf.Max(camera.farClipPlane, 40f);
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = Color.black;
+            camera.orthographic = true;
+            if (camera.orthographicSize <= 0.01f)
+            {
+                camera.orthographicSize = 3f;
+            }
+
+            if (created)
+            {
+                camera.transform.position = new Vector3(0f, 0f, -10f);
+                camera.transform.rotation = Quaternion.identity;
+                camera.orthographicSize = 3f;
+            }
+
+            TrySetMainCameraTag(camera);
+            return camera;
+        }
+
+        private static void ActivateHierarchy(Transform target)
+        {
+            while (target != null)
+            {
+                if (!target.gameObject.activeSelf)
+                {
+                    target.gameObject.SetActive(true);
+                }
+
+                target = target.parent;
+            }
+        }
+
+        private static void TrySetMainCameraTag(Camera camera)
+        {
+            if (camera == null || camera.CompareTag("MainCamera"))
+            {
+                return;
+            }
+
+            try
+            {
+                camera.tag = "MainCamera";
+            }
+            catch (UnityException)
+            {
+            }
+        }
+
+        private Vector2 GetPreviewScaleSign()
+        {
+            bool flipX = false;
+            bool flipY = IsVideoVerticallyFlipped();
+
+            if (ShouldMirrorPreview())
+            {
+                RotationAngle rotation = GetVideoRotationAngle();
+                if (rotation == RotationAngle.Rotation0 || rotation == RotationAngle.Rotation180)
+                {
+                    flipX = !flipX;
+                }
+                else
+                {
+                    flipY = !flipY;
+                }
+            }
+
+            return new Vector2(flipX ? -1f : 1f, flipY ? -1f : 1f);
         }
 
         private int FrameWidth()
@@ -757,6 +988,7 @@ namespace ARCloset
             DisposePoseLandmarker();
 
             useGpuInference = preferGpu;
+            useGpuImageInput = preferGpu && SupportsGpuImageInput() && GpuManager.GetGlContext() != null;
             try
             {
                 poseLandmarker = CreatePoseLandmarker(modelPath, useGpuInference);
@@ -765,6 +997,7 @@ namespace ARCloset
             {
                 Debug.LogWarning($"MediaPipe GPU initialization failed, falling back to CPU: {exception.Message}");
                 useGpuInference = false;
+                useGpuImageInput = false;
                 poseLandmarker = CreatePoseLandmarker(modelPath, false);
             }
 
@@ -810,6 +1043,7 @@ namespace ARCloset
             }
 
             useGpuInference = false;
+            useGpuImageInput = false;
         }
 
         private string ResolveModelPath()

@@ -83,7 +83,11 @@ namespace ARClosetEditor
             GameObject bridge = new GameObject("MediaPipePoseBridge");
             MediaPipePoseReceiver poseReceiver = bridge.AddComponent<MediaPipePoseReceiver>();
             MediaPipeVideoReceiver videoReceiver = bridge.AddComponent<MediaPipeVideoReceiver>();
+            videoReceiver.enabled = false;
             MediaPipeUnityPoseSource unityPoseSource = bridge.AddComponent<MediaPipeUnityPoseSource>();
+            PoseTraceRecorder traceRecorder = bridge.AddComponent<PoseTraceRecorder>();
+            PoseTraceReplaySource traceReplaySource = bridge.AddComponent<PoseTraceReplaySource>();
+            SyntheticPoseSource syntheticPoseSource = bridge.AddComponent<SyntheticPoseSource>();
             SerializedObject poseReceiverObject = new SerializedObject(poseReceiver);
             poseReceiverObject.Update();
             poseReceiverObject.FindProperty("staleAfterSeconds").floatValue = 1.5f;
@@ -99,19 +103,66 @@ namespace ARClosetEditor
             unityPoseSourceObject.FindProperty("receiver").objectReferenceValue = poseReceiver;
             unityPoseSourceObject.FindProperty("previewRenderer").objectReferenceValue = videoBackgroundRenderer;
             unityPoseSourceObject.FindProperty("previewCamera").objectReferenceValue = overlayCamera;
-            unityPoseSourceObject.FindProperty("modelFileName").stringValue = "pose_landmarker_full.bytes";
+            unityPoseSourceObject.FindProperty("ensureRenderingCamera").boolValue = true;
+            unityPoseSourceObject.FindProperty("requestedWidth").intValue = 640;
+            unityPoseSourceObject.FindProperty("requestedHeight").intValue = 480;
+            unityPoseSourceObject.FindProperty("modelFileName").stringValue = "pose_landmarker_lite.bytes";
             unityPoseSourceObject.FindProperty("mirrorPreview").boolValue = true;
             unityPoseSourceObject.FindProperty("mirrorInput").boolValue = true;
             unityPoseSourceObject.FindProperty("allowRuntimeCameraSwitch").boolValue = true;
-            unityPoseSourceObject.FindProperty("autoSwitchFlatCameraFeed").boolValue = true;
+            unityPoseSourceObject.FindProperty("autoSwitchFlatCameraFeed").boolValue = false;
             unityPoseSourceObject.FindProperty("flatCameraVarianceThreshold").floatValue = 300f;
             unityPoseSourceObject.FindProperty("emptyCameraMeanEdgeThreshold").floatValue = 22f;
             unityPoseSourceObject.FindProperty("flatCameraAutoSwitchSeconds").floatValue = 4f;
             unityPoseSourceObject.FindProperty("minPoseDetectionConfidence").floatValue = 0.22f;
             unityPoseSourceObject.FindProperty("minPosePresenceConfidence").floatValue = 0.22f;
             unityPoseSourceObject.FindProperty("minTrackingConfidence").floatValue = 0.22f;
+            unityPoseSourceObject.FindProperty("preferLiteModel").boolValue = true;
+            unityPoseSourceObject.FindProperty("inferenceBackend").enumValueIndex = 2;
+            unityPoseSourceObject.FindProperty("maxInferenceFps").intValue = 30;
+            unityPoseSourceObject.FindProperty("cpuFrameStride").intValue = 1;
             unityPoseSourceObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(unityPoseSource);
+
+            SerializedObject traceRecorderObject = new SerializedObject(traceRecorder);
+            traceRecorderObject.Update();
+            traceRecorderObject.FindProperty("receiver").objectReferenceValue = poseReceiver;
+            traceRecorderObject.FindProperty("recordOnStart").boolValue = false;
+            traceRecorderObject.FindProperty("toggleRecordingKey").intValue = (int)KeyCode.R;
+            traceRecorderObject.FindProperty("outputDirectory").stringValue = "PoseTraces";
+            traceRecorderObject.FindProperty("fileNamePrefix").stringValue = "pose-trace";
+            traceRecorderObject.FindProperty("onlyRecordFreshPose").boolValue = true;
+            traceRecorderObject.FindProperty("onlyRecordNewSequence").boolValue = true;
+            traceRecorderObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(traceRecorder);
+
+            SerializedObject traceReplayObject = new SerializedObject(traceReplaySource);
+            traceReplayObject.Update();
+            traceReplayObject.FindProperty("receiver").objectReferenceValue = poseReceiver;
+            traceReplayObject.FindProperty("livePoseSource").objectReferenceValue = unityPoseSource;
+            traceReplayObject.FindProperty("traceDirectory").stringValue = "PoseTraces";
+            traceReplayObject.FindProperty("loadLatestTraceFromDirectory").boolValue = true;
+            traceReplayObject.FindProperty("reloadTraceOnStart").boolValue = true;
+            traceReplayObject.FindProperty("playOnStart").boolValue = false;
+            traceReplayObject.FindProperty("toggleReplayKey").intValue = (int)KeyCode.P;
+            traceReplayObject.FindProperty("loop").boolValue = true;
+            traceReplayObject.FindProperty("usePacketTimestamps").boolValue = true;
+            traceReplayObject.FindProperty("stopLivePoseSourceWhileReplaying").boolValue = true;
+            traceReplayObject.FindProperty("restoreLivePoseSourceOnStop").boolValue = true;
+            traceReplayObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(traceReplaySource);
+
+            SerializedObject syntheticPoseObject = new SerializedObject(syntheticPoseSource);
+            syntheticPoseObject.Update();
+            syntheticPoseObject.FindProperty("receiver").objectReferenceValue = poseReceiver;
+            syntheticPoseObject.FindProperty("livePoseSource").objectReferenceValue = unityPoseSource;
+            syntheticPoseObject.FindProperty("playOnStart").boolValue = false;
+            syntheticPoseObject.FindProperty("toggleSyntheticKey").intValue = (int)KeyCode.G;
+            syntheticPoseObject.FindProperty("syntheticFps").floatValue = 30f;
+            syntheticPoseObject.FindProperty("stopLivePoseSourceWhilePlaying").boolValue = true;
+            syntheticPoseObject.FindProperty("restoreLivePoseSourceOnStop").boolValue = true;
+            syntheticPoseObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(syntheticPoseSource);
 
             GameObject mannequin = new GameObject("TrackingMannequin");
             GameObject poseRigObject = new GameObject("PoseRig");
@@ -137,6 +188,7 @@ namespace ARClosetEditor
             GarmentFittingController fittingController = mannequin.AddComponent<GarmentFittingController>();
             GarmentHotkeys hotkeys = mannequin.AddComponent<GarmentHotkeys>();
             MediaPipePoseRigDriver rigDriver = mannequin.AddComponent<MediaPipePoseRigDriver>();
+            PoseFitStabilityMonitor stabilityMonitor = mannequin.AddComponent<PoseFitStabilityMonitor>();
             GarmentCatalog sceneCatalog = AssetDatabase.LoadAssetAtPath<GarmentCatalog>(CatalogFolder + "/DemoGarmentCatalog.asset");
             if (sceneCatalog != null)
             {
@@ -167,7 +219,22 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("mirrorX").boolValue = false;
             rigDriverObject.FindProperty("showDebugRig").boolValue = true;
             rigDriverObject.FindProperty("debugRigZOffset").floatValue = -0.35f;
-            rigDriverObject.FindProperty("smoothing").floatValue = 0.55f;
+            rigDriverObject.FindProperty("smoothing").floatValue = 0.75f;
+            rigDriverObject.FindProperty("landmarkSmoothTime").floatValue = 0.045f;
+            rigDriverObject.FindProperty("lowConfidenceLandmarkSmoothTime").floatValue = 0.14f;
+            rigDriverObject.FindProperty("maxLandmarkSpeed").floatValue = 14f;
+            rigDriverObject.FindProperty("landmarkOutlierDistance").floatValue = 1.2f;
+            rigDriverObject.FindProperty("maxMissingLandmarkFrames").intValue = 4;
+            rigDriverObject.FindProperty("lowLatencyGarmentAnchor").boolValue = true;
+            rigDriverObject.FindProperty("anchorSmoothTime").floatValue = 0.20f;
+            rigDriverObject.FindProperty("maxAnchorSpeed").floatValue = 2.4f;
+            rigDriverObject.FindProperty("maxAnchorAngularSpeed").floatValue = 100f;
+            rigDriverObject.FindProperty("scaleSmoothTime").floatValue = 0.26f;
+            rigDriverObject.FindProperty("maxScaleSpeed").floatValue = 1.8f;
+            rigDriverObject.FindProperty("maxAnchorJumpDistance").floatValue = 0.9f;
+            rigDriverObject.FindProperty("deformGarmentWithPose").boolValue = false;
+            rigDriverObject.FindProperty("rotateGarmentWithShoulders").boolValue = false;
+            rigDriverObject.FindProperty("allowSmoothedFitFallback").boolValue = true;
             rigDriverObject.FindProperty("fitGarmentByRendererBounds").boolValue = true;
             rigDriverObject.FindProperty("clampGarmentTargetToCamera").boolValue = true;
             rigDriverObject.FindProperty("fitScaleMultiplier").floatValue = 1.0f;
@@ -176,6 +243,16 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("maxGarmentScale").floatValue = 8.0f;
             rigDriverObject.FindProperty("minFitVisibility").floatValue = 0.24f;
             rigDriverObject.FindProperty("normalizedOverscan").floatValue = 0.08f;
+            rigDriverObject.FindProperty("minNormalizedShoulderWidth").floatValue = 0.045f;
+            rigDriverObject.FindProperty("minNormalizedHipWidth").floatValue = 0.025f;
+            rigDriverObject.FindProperty("minNormalizedTorsoHeight").floatValue = 0.12f;
+            rigDriverObject.FindProperty("maxNormalizedShoulderHipOffset").floatValue = 0.32f;
+            rigDriverObject.FindProperty("minMappedShoulderWidth").floatValue = 0.045f;
+            rigDriverObject.FindProperty("torsoBoundsWidthWeight").floatValue = 0.35f;
+            rigDriverObject.FindProperty("fitHoldSeconds").floatValue = 0.22f;
+            rigDriverObject.FindProperty("showFitDebugOverlay").boolValue = false;
+            rigDriverObject.FindProperty("toggleFitDebugKey").intValue = (int)KeyCode.F;
+            rigDriverObject.FindProperty("fitDebugZOffset").floatValue = -0.28f;
             rigDriverObject.FindProperty("hideGarmentWhenPoseLost").boolValue = true;
             rigDriverObject.FindProperty("showDynamicSleeves").boolValue = false;
             rigDriverObject.FindProperty("leftUpperSleeve").objectReferenceValue = sleeveParts.LeftUpperSleeve;
@@ -197,6 +274,23 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("rightCalf").objectReferenceValue = rigParts.RightCalf;
             rigDriverObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(rigDriver);
+
+            SerializedObject monitorObject = new SerializedObject(stabilityMonitor);
+            monitorObject.Update();
+            monitorObject.FindProperty("receiver").objectReferenceValue = poseReceiver;
+            monitorObject.FindProperty("rigDriver").objectReferenceValue = rigDriver;
+            monitorObject.FindProperty("monitorOnStart").boolValue = false;
+            monitorObject.FindProperty("toggleMonitorKey").intValue = (int)KeyCode.V;
+            monitorObject.FindProperty("reportWindowSeconds").floatValue = 5f;
+            monitorObject.FindProperty("minPoseFps").floatValue = 1f;
+            monitorObject.FindProperty("maxAnchorStd").floatValue = 0.08f;
+            monitorObject.FindProperty("maxAnchorStep").floatValue = 0.25f;
+            monitorObject.FindProperty("maxScaleStd").floatValue = 0.05f;
+            monitorObject.FindProperty("maxTargetCenterStd").floatValue = 0.10f;
+            monitorObject.FindProperty("writeCsv").boolValue = true;
+            monitorObject.FindProperty("outputDirectory").stringValue = "PoseValidation";
+            monitorObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(stabilityMonitor);
 
             if (initialGarment != null && initialGarment.garmentPrefab != null)
             {
@@ -344,8 +438,45 @@ namespace ARClosetEditor
             definition.slot = slot;
             definition.garmentPrefab = prefab;
             definition.localScale = Vector3.one;
+            ConfigureGarmentFitProfile(definition);
             EditorUtility.SetDirty(definition);
             return definition;
+        }
+
+        private static void ConfigureGarmentFitProfile(GarmentDefinition definition)
+        {
+            definition.fitAnchorOffset = Vector2.zero;
+            definition.fitWidthMultiplier = 1.0f;
+            definition.fitHeightMultiplier = 1.0f;
+            definition.fitVerticalBias = 0.0f;
+
+            switch (definition.garmentId)
+            {
+                case "mh-fisherman-sweater":
+                    definition.fitAnchorOffset = new Vector2(0f, -0.03f);
+                    definition.fitWidthMultiplier = 1.06f;
+                    definition.fitHeightMultiplier = 1.02f;
+                    definition.fitVerticalBias = 0.02f;
+                    break;
+                case "mh-kimono":
+                    definition.fitAnchorOffset = new Vector2(0f, -0.02f);
+                    definition.fitWidthMultiplier = 1.14f;
+                    definition.fitHeightMultiplier = 1.04f;
+                    definition.fitVerticalBias = 0.02f;
+                    break;
+                case "mh-shift-dress":
+                    definition.fitAnchorOffset = new Vector2(0f, -0.02f);
+                    definition.fitWidthMultiplier = 1.04f;
+                    definition.fitHeightMultiplier = 1.05f;
+                    definition.fitVerticalBias = 0.03f;
+                    break;
+                case "mh-wool-pants":
+                    definition.fitAnchorOffset = new Vector2(0f, -0.02f);
+                    definition.fitWidthMultiplier = 1.02f;
+                    definition.fitHeightMultiplier = 1.03f;
+                    definition.fitVerticalBias = 0.01f;
+                    break;
+            }
         }
 
         private static GameObject CreateMakeHumanPrefab(

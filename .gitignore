@@ -37,5 +37,9 @@ sysinfo.txt
 # Local compile output
 unity-compile-check.log
 
+# AR Closet local validation output
+PoseTraces/
+PoseValidation/
+
 # Redundant local package archives
 Packages/LocalTarballs/

@@ -39,6 +39,10 @@ Then open `Assets/ARCloset/Scenes/ARClosetDemo.unity` in Unity and press Play.
 - `D`: Toggle the debug skeleton overlay
 - `M`: Mirror the webcam preview and MediaPipe input together
 - `X`: Mirror the skeleton/garment overlay only
+- `R`: Start/stop pose trace recording to `PoseTraces/*.ndjson`
+- `P`: Replay the latest trace from `PoseTraces`
+- `G`: Toggle synthetic pose input
+- `V`: Start/stop fit stability monitoring to `PoseValidation/*.csv`
 - Arrow keys: Move the garment fit offset while debugging
 - `+` / `-`: Scale the garment fit while debugging
 - `Backspace`: Reset garment fit offset and scale
@@ -48,6 +52,10 @@ Then open `Assets/ARCloset/Scenes/ARClosetDemo.unity` in Unity and press Play.
 `Webcam -> Unity WebCamTexture -> homuler PoseLandmarker -> MediaPipePoseReceiver.PushPacket -> MediaPipePoseRigDriver`
 
 `Webcam -> Python MediaPipe Pose Landmarker -> UDP JSON -> MediaPipePoseReceiver -> MediaPipePoseRigDriver`
+
+`PoseTraces/*.ndjson -> PoseTraceReplaySource -> MediaPipePoseReceiver.PushPacket -> MediaPipePoseRigDriver`
+
+`SyntheticPoseSource -> MediaPipePoseReceiver.PushPacket -> MediaPipePoseRigDriver`
 
 `Webcam -> Python JPEG frame stream -> TCP 5053 -> MediaPipeVideoReceiver -> LiveVideoBackground`
 
@@ -68,6 +76,22 @@ The current garments are OBJ meshes, so the base garment still uses pose-driven 
 - Sleeve transforms are driven by shoulder, elbow, and wrist landmarks and reuse the current garment material.
 
 This is a rigging MVP, not full cloth simulation. Production-quality sleeve bending should replace the procedural sleeve overlay with skinned garment meshes bound to the tracked rig, or a cloth simulation layer on top of the current landmark fit.
+
+## Camera-free Validation
+
+The demo scene includes a pose replay and synthetic validation path so garment fitting can be tested without someone standing in front of the camera.
+
+- `PoseTraceRecorder` writes compact MediaPipe pose packets as newline-delimited JSON.
+- `PoseTraceReplaySource` loads the latest `PoseTraces/*.ndjson`, stops the live Unity pose source while replaying, and injects packets through the same receiver path as the camera.
+- `SyntheticPoseSource` generates stable, swaying, noisy, outlier, low-confidence, and missing-lower-body pose packets.
+- `PoseFitStabilityMonitor` reports pass/fail windows using pose FPS, garment anchor jitter, scale jitter, target-center jitter, stale samples, and missing fit samples.
+
+Use this flow for regression checks:
+
+1. Press `R` while live tracking is working to record a trace, then press `R` again to stop.
+2. Press `P` to replay the latest trace without the camera.
+3. Press `G` to switch to a synthetic pose source when no trace is available.
+4. Press `V` during replay or synthetic input to write stability metrics to `PoseValidation`.
 
 The current demo scene is configured as an AR overlay:
 

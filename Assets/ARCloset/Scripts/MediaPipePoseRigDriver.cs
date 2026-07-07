@@ -37,8 +37,24 @@ namespace ARCloset
         [SerializeField] private float verticalScale = 3.15f;
         [SerializeField] private float depthScale = 0.12f;
         [SerializeField] private float verticalOffset = 0.0f;
-        [SerializeField] private float smoothing = 0.34f;
+        [SerializeField] private float smoothing = 0.75f;
         [SerializeField] private float overlayZ = 0.0f;
+
+        [Header("Pose Filter")]
+        [SerializeField, Range(0.02f, 0.7f)] private float landmarkSmoothTime = 0.045f;
+        [SerializeField, Range(0.02f, 0.9f)] private float lowConfidenceLandmarkSmoothTime = 0.14f;
+        [SerializeField, Range(0.2f, 24f)] private float maxLandmarkSpeed = 14f;
+        [SerializeField, Range(0.05f, 2f)] private float landmarkOutlierDistance = 1.2f;
+        [SerializeField, Range(1, 30)] private int maxMissingLandmarkFrames = 4;
+
+        [Header("Anchor Filter")]
+        [SerializeField] private bool lowLatencyGarmentAnchor = true;
+        [SerializeField, Range(0.02f, 0.8f)] private float anchorSmoothTime = 0.20f;
+        [SerializeField, Range(0.1f, 10f)] private float maxAnchorSpeed = 2.4f;
+        [SerializeField, Range(15f, 360f)] private float maxAnchorAngularSpeed = 100f;
+        [SerializeField, Range(0.02f, 0.8f)] private float scaleSmoothTime = 0.26f;
+        [SerializeField, Range(0.1f, 10f)] private float maxScaleSpeed = 1.8f;
+        [SerializeField, Range(0.1f, 5f)] private float maxAnchorJumpDistance = 0.9f;
 
         [Header("Rig")]
         [SerializeField] private bool showDebugRig = true;
@@ -61,6 +77,9 @@ namespace ARCloset
 
         [Header("Fit")]
         [SerializeField] private bool hideGarmentWhenPoseLost = true;
+        [SerializeField] private bool deformGarmentWithPose = false;
+        [SerializeField] private bool rotateGarmentWithShoulders = false;
+        [SerializeField] private bool allowSmoothedFitFallback = true;
         [SerializeField] private bool fitGarmentByRendererBounds = true;
         [SerializeField] private bool clampGarmentTargetToCamera = true;
         [SerializeField] private float restShoulderWidth = 0.92f;
@@ -68,6 +87,13 @@ namespace ARCloset
         [SerializeField] private float maxGarmentScale = 8.0f;
         [SerializeField] private float minFitVisibility = 0.24f;
         [SerializeField] private float normalizedOverscan = 0.08f;
+        [SerializeField, Range(0.005f, 0.2f)] private float minNormalizedShoulderWidth = 0.045f;
+        [SerializeField, Range(0.005f, 0.2f)] private float minNormalizedHipWidth = 0.025f;
+        [SerializeField, Range(0.02f, 0.7f)] private float minNormalizedTorsoHeight = 0.12f;
+        [SerializeField, Range(0.02f, 0.7f)] private float maxNormalizedShoulderHipOffset = 0.32f;
+        [SerializeField, Range(0.005f, 0.2f)] private float minMappedShoulderWidth = 0.045f;
+        [SerializeField, Range(0f, 1f)] private float torsoBoundsWidthWeight = 0.35f;
+        [SerializeField, Range(0.05f, 1f)] private float fitHoldSeconds = 0.22f;
         [SerializeField] private float fitScaleMultiplier = 1.0f;
         [SerializeField] private Vector2 fitOffset = Vector2.zero;
         [SerializeField] private float keyboardOffsetStep = 0.04f;
@@ -76,6 +102,11 @@ namespace ARCloset
         [SerializeField] private float lowerWidthPadding = 1.22f;
         [SerializeField] private float onePieceWidthPadding = 1.18f;
         [SerializeField] private float outerwearWidthPadding = 1.28f;
+
+        [Header("Fit Debug")]
+        [SerializeField] private bool showFitDebugOverlay = false;
+        [SerializeField] private KeyCode toggleFitDebugKey = KeyCode.F;
+        [SerializeField] private float fitDebugZOffset = -0.28f;
 
         [Header("Dynamic Sleeve Rig")]
         [SerializeField] private bool showDynamicSleeves = false;
@@ -89,8 +120,11 @@ namespace ARCloset
         [SerializeField] private float sleeveZOffset = -0.16f;
 
         private readonly Vector3[] smoothedPoints = new Vector3[33];
+        private readonly Vector3[] pointVelocities = new Vector3[33];
+        private readonly int[] missedPointFrames = new int[33];
         private readonly bool[] hasPoint = new bool[33];
         private int lastSequence = -1;
+        private float lastPoseFilterTime = -1f;
         private float mappedWidth;
         private float mappedHeight;
         private int displayRotationDegrees;
@@ -100,6 +134,23 @@ namespace ARCloset
         private Vector3 lastFitTargetCenter;
         private float lastFitTargetWidth;
         private float lastFitTargetHeight;
+        private bool hasLastFitTarget;
+        private Vector3 garmentAnchorVelocity;
+        private float garmentScaleVelocity;
+        private bool hasGarmentAnchorFilter;
+        private BodyFit lastReliableBodyFit;
+        private bool hasLastReliableBodyFit;
+        private float lastReliableBodyFitTime = -1f;
+        private LineRenderer bodyFitDebugLine;
+        private LineRenderer garmentFitDebugLine;
+        private LineRenderer fitAxisDebugLine;
+
+        public bool HasFitTarget => hasLastFitTarget;
+        public Vector3 LastFitTargetCenter => lastFitTargetCenter;
+        public float LastFitTargetWidth => lastFitTargetWidth;
+        public float LastFitTargetHeight => lastFitTargetHeight;
+        public bool HasGarmentAnchorFilter => hasGarmentAnchorFilter;
+        public Transform GarmentAnchorTransform => garmentAnchor;
 
         private void Reset()
         {
@@ -122,6 +173,8 @@ namespace ARCloset
             {
                 SetGarmentVisibility(!hideGarmentWhenPoseLost);
                 ResetRuntimeGarmentRig();
+                ResetGarmentAnchorFilter();
+                ClearFitTarget();
                 SetDynamicSleevesVisible(false);
                 SetDebugRigVisible(false);
             }
@@ -139,6 +192,15 @@ namespace ARCloset
             {
                 mirrorX = !mirrorX;
                 ClearSmoothedPoints();
+            }
+
+            if (Input.GetKeyDown(toggleFitDebugKey))
+            {
+                showFitDebugOverlay = !showFitDebugOverlay;
+                if (!showFitDebugOverlay)
+                {
+                    HideFitDebugOverlay();
+                }
             }
 
             float offsetStep = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)
@@ -182,6 +244,8 @@ namespace ARCloset
             {
                 SetGarmentVisibility(!hideGarmentWhenPoseLost);
                 ResetRuntimeGarmentRig();
+                ResetGarmentAnchorFilter();
+                ClearFitTarget();
                 SetDynamicSleevesVisible(false);
                 SetDebugRigVisible(false);
                 ClearSmoothedPoints();
@@ -192,6 +256,8 @@ namespace ARCloset
             {
                 SetGarmentVisibility(!hideGarmentWhenPoseLost);
                 ResetRuntimeGarmentRig();
+                ResetGarmentAnchorFilter();
+                ClearFitTarget();
                 SetDynamicSleevesVisible(false);
                 SetDebugRigVisible(false);
                 ClearSmoothedPoints();
@@ -209,33 +275,94 @@ namespace ARCloset
 
         private void UpdatePosePoints(MediaPipePosePacket packet, bool newPacket)
         {
-            float alpha = newPacket ? Mathf.Clamp01(smoothing) : 1f;
             UpdateViewportMapping(packet);
+            if (!newPacket)
+            {
+                return;
+            }
+
+            float now = Time.realtimeSinceStartup;
+            float dt = lastPoseFilterTime > 0f ? now - lastPoseFilterTime : Time.deltaTime;
+            lastPoseFilterTime = now;
+            dt = Mathf.Clamp(dt, 1f / 120f, 0.12f);
+
             bool swapLeftRight = keepVisualLeftRightOrder && ShouldSwapLeftRight(packet);
 
             for (int i = 0; i < smoothedPoints.Length; i++)
             {
                 MediaPipePoseLandmark landmark = packet.landmarks[i];
-                bool visible = landmark.visibility >= minVisibility || landmark.presence >= minVisibility;
+                float confidence = Mathf.Max(landmark.visibility, landmark.presence);
+                int targetIndex = swapLeftRight ? SwappedPoseIndex(i) : i;
+                bool visible = confidence >= minVisibility;
 
                 if (!visible)
                 {
+                    MarkLandmarkMissing(targetIndex);
                     continue;
                 }
 
-                int targetIndex = swapLeftRight ? SwappedPoseIndex(i) : i;
                 Vector3 target = ToRigPoint(landmark, packet);
-
-                if (!hasPoint[targetIndex])
-                {
-                    smoothedPoints[targetIndex] = target;
-                    hasPoint[targetIndex] = true;
-                }
-                else
-                {
-                    smoothedPoints[targetIndex] = Vector3.Lerp(smoothedPoints[targetIndex], target, alpha);
-                }
+                UpdateFilteredLandmark(targetIndex, target, confidence, dt);
             }
+        }
+
+        private void UpdateFilteredLandmark(int index, Vector3 target, float confidence, float dt)
+        {
+            if (index < 0 || index >= smoothedPoints.Length)
+            {
+                return;
+            }
+
+            missedPointFrames[index] = 0;
+            if (!hasPoint[index])
+            {
+                smoothedPoints[index] = target;
+                pointVelocities[index] = Vector3.zero;
+                hasPoint[index] = true;
+                return;
+            }
+
+            Vector3 current = smoothedPoints[index];
+            Vector3 delta = target - current;
+            float maxJump = Mathf.Max(0.001f, landmarkOutlierDistance);
+            if (delta.magnitude > maxJump)
+            {
+                target = current + delta.normalized * maxJump;
+                delta = target - current;
+            }
+
+            float maxStep = Mathf.Max(0.001f, maxLandmarkSpeed) * Mathf.Max(dt, 1f / 120f);
+            if (delta.magnitude > maxStep)
+            {
+                target = current + delta.normalized * maxStep;
+            }
+
+            float confidence01 = Mathf.InverseLerp(minVisibility, 1f, confidence);
+            float confidenceAlpha = Mathf.Lerp(Mathf.Clamp01(smoothing) * 0.45f, Mathf.Clamp01(smoothing), confidence01);
+            float smoothTime = Mathf.Lerp(lowConfidenceLandmarkSmoothTime, landmarkSmoothTime, confidence01);
+            float timeAlpha = 1f - Mathf.Exp(-Mathf.Max(dt, 1f / 120f) / Mathf.Max(0.001f, smoothTime));
+            float alpha = Mathf.Clamp01(Mathf.Max(confidenceAlpha, timeAlpha));
+            smoothedPoints[index] = Vector3.Lerp(current, target, alpha);
+            pointVelocities[index] = Vector3.zero;
+        }
+
+        private void MarkLandmarkMissing(int index)
+        {
+            if (index < 0 || index >= smoothedPoints.Length || !hasPoint[index])
+            {
+                return;
+            }
+
+            missedPointFrames[index]++;
+            if (missedPointFrames[index] <= maxMissingLandmarkFrames)
+            {
+                pointVelocities[index] *= 0.65f;
+                return;
+            }
+
+            hasPoint[index] = false;
+            pointVelocities[index] = Vector3.zero;
+            missedPointFrames[index] = 0;
         }
         private Vector3 ToRigPoint(MediaPipePoseLandmark landmark, MediaPipePosePacket packet)
         {
@@ -438,32 +565,53 @@ namespace ARCloset
 
         private void ApplyGarmentAnchor(MediaPipePosePacket packet)
         {
-            if (garmentAnchor == null || !HasPoint(LeftShoulder) || !HasPoint(RightShoulder))
+            if (garmentAnchor == null)
             {
                 return;
             }
 
-            BodyFit bodyFit = BuildBodyFit();
             GarmentSlot slot = fittingController != null ? fittingController.CurrentSlot : GarmentSlot.Upper;
+            bool hasCurrentBodyFit = TryBuildBodyFit(slot, out BodyFit bodyFit);
+            bool hasReliableFit = hasCurrentBodyFit &&
+                                  (HasReliableFitInput(packet, slot) ||
+                                   (allowSmoothedFitFallback && HasSmoothedFitInput(slot)));
+            if (hasReliableFit)
+            {
+                lastReliableBodyFit = bodyFit;
+                hasLastReliableBodyFit = true;
+                lastReliableBodyFitTime = Time.realtimeSinceStartup;
+            }
+            else
+            {
+                hasReliableFit = TryGetHeldBodyFit(out bodyFit);
+            }
 
-            if (!HasReliableFitInput(packet, slot))
+            if (!hasReliableFit)
             {
                 SetGarmentVisibility(!hideGarmentWhenPoseLost);
                 ResetRuntimeGarmentRig();
+                ResetGarmentAnchorFilter();
+                ClearFitTarget();
                 SetDynamicSleevesVisible(false);
+                HideFitDebugOverlay();
                 return;
             }
 
             SetDebugRigVisible(showDebugRig);
             SetGarmentVisibility(true);
-            GetGarmentTarget(slot, bodyFit, out Vector3 targetCenter, out float targetWidth, out float targetHeight, out float heightBlend);
-            Vector3 targetAnchor = GetGarmentAnchorTarget(slot, bodyFit);
-            Vector3 offset = new Vector3(fitOffset.x, fitOffset.y, 0f);
+            GarmentDefinition definition = fittingController != null ? fittingController.CurrentDefinition : null;
+            float profileWidthMultiplier = definition != null ? Mathf.Max(0.01f, definition.fitWidthMultiplier) : 1f;
+            float profileHeightMultiplier = definition != null ? Mathf.Max(0.01f, definition.fitHeightMultiplier) : 1f;
+            float profileVerticalBias = definition != null ? definition.fitVerticalBias : 0f;
+            Vector2 profileOffset = definition != null ? definition.fitAnchorOffset : Vector2.zero;
+            GetGarmentTarget(slot, bodyFit, profileVerticalBias, out Vector3 targetCenter, out float targetWidth, out float targetHeight, out float heightBlend);
+            Vector3 targetAnchor = GetGarmentAnchorTarget(slot, bodyFit, profileVerticalBias);
+            Vector3 offset = new Vector3(profileOffset.x + fitOffset.x, profileOffset.y + fitOffset.y, 0f);
             targetCenter += offset;
             targetAnchor += offset;
-            targetWidth *= fitScaleMultiplier;
-            targetHeight *= fitScaleMultiplier;
-            Quaternion targetRotation = bodyFit.Rotation;
+            targetWidth *= fitScaleMultiplier * profileWidthMultiplier;
+            targetHeight *= fitScaleMultiplier * profileHeightMultiplier;
+            Quaternion targetRotation = rotateGarmentWithShoulders ? bodyFit.Rotation : Quaternion.identity;
             float scale = Mathf.Clamp(targetWidth / Mathf.Max(0.01f, restShoulderWidth), minGarmentScale, maxGarmentScale);
             float clampWidth = targetWidth;
             float clampHeight = targetHeight;
@@ -494,12 +642,189 @@ namespace ARCloset
             lastFitTargetCenter = targetCenter;
             lastFitTargetWidth = targetWidth;
             lastFitTargetHeight = targetHeight;
+            hasLastFitTarget = true;
 
-            garmentAnchor.localPosition = Vector3.Lerp(garmentAnchor.localPosition, targetPosition, smoothing);
-            garmentAnchor.localRotation = Quaternion.Slerp(garmentAnchor.localRotation, targetRotation, smoothing);
-            garmentAnchor.localScale = Vector3.Lerp(garmentAnchor.localScale, Vector3.one * scale, smoothing);
-            ApplyRuntimeGarmentRig();
-            ApplyDynamicSleeves(slot);
+            UpdateFitDebugOverlay(bodyFit, targetCenter, clampWidth, clampHeight);
+            ApplyGarmentAnchorFilter(targetPosition, targetRotation, scale);
+            if (deformGarmentWithPose)
+            {
+                ApplyRuntimeGarmentRig();
+                ApplyDynamicSleeves(slot);
+            }
+            else
+            {
+                ResetRuntimeGarmentRig();
+                SetDynamicSleevesVisible(false);
+            }
+        }
+
+        private void ApplyGarmentAnchorFilter(Vector3 targetPosition, Quaternion targetRotation, float targetScale)
+        {
+            if (garmentAnchor == null)
+            {
+                return;
+            }
+
+            float dt = Mathf.Clamp(Time.deltaTime, 1f / 120f, 0.12f);
+            if (!hasGarmentAnchorFilter)
+            {
+                garmentAnchor.localPosition = targetPosition;
+                garmentAnchor.localRotation = targetRotation;
+                garmentAnchor.localScale = Vector3.one * targetScale;
+                garmentAnchorVelocity = Vector3.zero;
+                garmentScaleVelocity = 0f;
+                hasGarmentAnchorFilter = true;
+                return;
+            }
+
+            Vector3 currentPosition = garmentAnchor.localPosition;
+            Vector3 delta = targetPosition - currentPosition;
+            if (delta.magnitude > maxAnchorJumpDistance)
+            {
+                targetPosition = currentPosition + delta.normalized * maxAnchorJumpDistance;
+            }
+
+            if (lowLatencyGarmentAnchor)
+            {
+                float alpha = Mathf.Clamp01(smoothing);
+                garmentAnchor.localPosition = Vector3.Lerp(currentPosition, targetPosition, alpha);
+                garmentAnchor.localRotation = Quaternion.Slerp(garmentAnchor.localRotation, targetRotation, alpha);
+                garmentAnchor.localScale = Vector3.Lerp(garmentAnchor.localScale, Vector3.one * targetScale, alpha);
+                garmentAnchorVelocity = Vector3.zero;
+                garmentScaleVelocity = 0f;
+                return;
+            }
+
+            garmentAnchor.localPosition = Vector3.SmoothDamp(
+                currentPosition,
+                targetPosition,
+                ref garmentAnchorVelocity,
+                anchorSmoothTime,
+                maxAnchorSpeed,
+                dt);
+            garmentAnchor.localRotation = Quaternion.RotateTowards(
+                garmentAnchor.localRotation,
+                targetRotation,
+                maxAnchorAngularSpeed * dt);
+
+            float currentScale = Mathf.Max(0.0001f, garmentAnchor.localScale.x);
+            float nextScale = Mathf.SmoothDamp(
+                currentScale,
+                targetScale,
+                ref garmentScaleVelocity,
+                scaleSmoothTime,
+                maxScaleSpeed,
+                dt);
+            garmentAnchor.localScale = Vector3.one * Mathf.Max(0.0001f, nextScale);
+        }
+
+        private void ResetGarmentAnchorFilter()
+        {
+            hasGarmentAnchorFilter = false;
+            garmentAnchorVelocity = Vector3.zero;
+            garmentScaleVelocity = 0f;
+        }
+
+        private void ClearFitTarget()
+        {
+            hasLastFitTarget = false;
+            lastFitTargetCenter = Vector3.zero;
+            lastFitTargetWidth = 0f;
+            lastFitTargetHeight = 0f;
+        }
+
+        private void UpdateFitDebugOverlay(BodyFit bodyFit, Vector3 targetCenter, float targetWidth, float targetHeight)
+        {
+            if (!showFitDebugOverlay)
+            {
+                HideFitDebugOverlay();
+                return;
+            }
+
+            float z = overlayZ + fitDebugZOffset;
+            Rect bodyBounds = bodyFit.VisibleBodyBounds;
+            if (bodyBounds.width > 0.001f && bodyBounds.height > 0.001f)
+            {
+                Vector2 bodyCenter = bodyBounds.center;
+                SetRectLine(
+                    EnsureFitLineRenderer(ref bodyFitDebugLine, "BodyFitDebugBounds", new Color(0f, 0.95f, 1f, 0.9f), 0.018f),
+                    new Vector3(bodyCenter.x, bodyCenter.y, z),
+                    bodyBounds.width,
+                    bodyBounds.height);
+            }
+
+            SetRectLine(
+                EnsureFitLineRenderer(ref garmentFitDebugLine, "GarmentFitDebugTarget", new Color(1f, 0.85f, 0.05f, 0.95f), 0.022f),
+                new Vector3(targetCenter.x, targetCenter.y, z),
+                targetWidth,
+                targetHeight);
+
+            LineRenderer axisLine = EnsureFitLineRenderer(ref fitAxisDebugLine, "FitDebugTorsoAxis", new Color(1f, 0.2f, 0.85f, 0.95f), 0.018f);
+            axisLine.positionCount = 2;
+            axisLine.SetPosition(0, new Vector3(bodyFit.ShoulderCenter.x, bodyFit.ShoulderCenter.y, z));
+            axisLine.SetPosition(1, new Vector3(bodyFit.HipCenter.x, bodyFit.HipCenter.y, z));
+            axisLine.enabled = true;
+        }
+
+        private void HideFitDebugOverlay()
+        {
+            SetFitLineVisible(bodyFitDebugLine, false);
+            SetFitLineVisible(garmentFitDebugLine, false);
+            SetFitLineVisible(fitAxisDebugLine, false);
+        }
+
+        private LineRenderer EnsureFitLineRenderer(ref LineRenderer line, string objectName, Color color, float width)
+        {
+            if (line == null)
+            {
+                GameObject lineObject = new GameObject(objectName);
+                lineObject.hideFlags = HideFlags.DontSave;
+                lineObject.transform.SetParent(transform, false);
+                line = lineObject.AddComponent<LineRenderer>();
+                line.useWorldSpace = false;
+                line.loop = false;
+                line.numCapVertices = 2;
+                line.numCornerVertices = 2;
+                line.material = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color"));
+                line.sortingOrder = 100;
+            }
+
+            line.widthMultiplier = width;
+            line.startColor = color;
+            line.endColor = color;
+            if (line.material != null)
+            {
+                line.material.color = color;
+            }
+
+            line.enabled = true;
+            return line;
+        }
+
+        private static void SetRectLine(LineRenderer line, Vector3 center, float width, float height)
+        {
+            if (line == null)
+            {
+                return;
+            }
+
+            float halfWidth = Mathf.Max(0.001f, width) * 0.5f;
+            float halfHeight = Mathf.Max(0.001f, height) * 0.5f;
+            line.positionCount = 5;
+            line.SetPosition(0, center + new Vector3(-halfWidth, -halfHeight, 0f));
+            line.SetPosition(1, center + new Vector3(-halfWidth, halfHeight, 0f));
+            line.SetPosition(2, center + new Vector3(halfWidth, halfHeight, 0f));
+            line.SetPosition(3, center + new Vector3(halfWidth, -halfHeight, 0f));
+            line.SetPosition(4, center + new Vector3(-halfWidth, -halfHeight, 0f));
+            line.enabled = true;
+        }
+
+        private static void SetFitLineVisible(LineRenderer line, bool visible)
+        {
+            if (line != null)
+            {
+                line.enabled = visible;
+            }
         }
 
         private bool HasReliableFitInput(MediaPipePosePacket packet, GarmentSlot slot)
@@ -515,7 +840,7 @@ namespace ARCloset
             }
 
             float shoulderWidthNormalized = Mathf.Abs(packet.landmarks[RightShoulder].x - packet.landmarks[LeftShoulder].x);
-            if (shoulderWidthNormalized < 0.035f)
+            if (shoulderWidthNormalized < minNormalizedShoulderWidth)
             {
                 return false;
             }
@@ -525,15 +850,102 @@ namespace ARCloset
                 case GarmentSlot.Lower:
                     return IsReliableLandmark(packet, LeftHip) &&
                            IsReliableLandmark(packet, RightHip) &&
+                           HasReliableTorsoGeometry(packet, true) &&
                            (IsReliableLandmark(packet, LeftKnee) || IsReliableLandmark(packet, RightKnee));
                 case GarmentSlot.OnePiece:
                     return IsReliableLandmark(packet, LeftHip) &&
-                           IsReliableLandmark(packet, RightHip);
+                           IsReliableLandmark(packet, RightHip) &&
+                           HasReliableTorsoGeometry(packet, true);
                 case GarmentSlot.Outerwear:
                 case GarmentSlot.Upper:
                 default:
-                    return true;
+                    return HasReliableTorsoGeometry(packet, false);
             }
+        }
+
+        private bool HasSmoothedFitInput(GarmentSlot slot)
+        {
+            if (!HasPoint(LeftShoulder) || !HasPoint(RightShoulder))
+            {
+                return false;
+            }
+
+            float shoulderWidth = Vector3.Distance(smoothedPoints[LeftShoulder], smoothedPoints[RightShoulder]);
+            float widthReference = Mathf.Max(0.001f, mappedWidth);
+            if (shoulderWidth < widthReference * minMappedShoulderWidth)
+            {
+                return false;
+            }
+
+            switch (slot)
+            {
+                case GarmentSlot.Lower:
+                    return HasPoint(LeftHip) && HasPoint(RightHip) && HasSmoothedTorsoGeometry(true);
+                case GarmentSlot.OnePiece:
+                    return HasPoint(LeftHip) && HasPoint(RightHip) && HasSmoothedTorsoGeometry(true);
+                case GarmentSlot.Outerwear:
+                case GarmentSlot.Upper:
+                default:
+                    return HasSmoothedTorsoGeometry(false);
+            }
+        }
+
+        private bool HasReliableTorsoGeometry(MediaPipePosePacket packet, bool requireHips)
+        {
+            bool hasHips = IsReliableLandmark(packet, LeftHip) && IsReliableLandmark(packet, RightHip);
+            if (!hasHips)
+            {
+                return !requireHips;
+            }
+
+            MediaPipePoseLandmark leftShoulder = packet.landmarks[LeftShoulder];
+            MediaPipePoseLandmark rightShoulder = packet.landmarks[RightShoulder];
+            MediaPipePoseLandmark leftHip = packet.landmarks[LeftHip];
+            MediaPipePoseLandmark rightHip = packet.landmarks[RightHip];
+
+            float hipWidth = Mathf.Abs(rightHip.x - leftHip.x);
+            if (hipWidth < minNormalizedHipWidth)
+            {
+                return false;
+            }
+
+            float shoulderCenterX = (leftShoulder.x + rightShoulder.x) * 0.5f;
+            float shoulderCenterY = (leftShoulder.y + rightShoulder.y) * 0.5f;
+            float hipCenterX = (leftHip.x + rightHip.x) * 0.5f;
+            float hipCenterY = (leftHip.y + rightHip.y) * 0.5f;
+
+            if (Mathf.Abs(hipCenterY - shoulderCenterY) < minNormalizedTorsoHeight)
+            {
+                return false;
+            }
+
+            return Mathf.Abs(hipCenterX - shoulderCenterX) <= maxNormalizedShoulderHipOffset;
+        }
+
+        private bool HasSmoothedTorsoGeometry(bool requireHips)
+        {
+            bool hasHips = HasPoint(LeftHip) && HasPoint(RightHip);
+            if (!hasHips)
+            {
+                return !requireHips;
+            }
+
+            float widthReference = Mathf.Max(0.001f, mappedWidth);
+            float heightReference = Mathf.Max(0.001f, mappedHeight);
+            float hipWidth = Vector3.Distance(smoothedPoints[LeftHip], smoothedPoints[RightHip]);
+            if (hipWidth < widthReference * minNormalizedHipWidth)
+            {
+                return false;
+            }
+
+            Vector3 shoulderCenter = (smoothedPoints[LeftShoulder] + smoothedPoints[RightShoulder]) * 0.5f;
+            Vector3 hipCenter = (smoothedPoints[LeftHip] + smoothedPoints[RightHip]) * 0.5f;
+            if (Mathf.Abs(hipCenter.y - shoulderCenter.y) < heightReference * minNormalizedTorsoHeight)
+            {
+                return false;
+            }
+
+            return Mathf.Abs(hipCenter.x - shoulderCenter.x) <= widthReference * maxNormalizedShoulderHipOffset;
         }
 
         private bool IsReliableLandmark(MediaPipePosePacket packet, int index)
@@ -764,31 +1176,50 @@ namespace ARCloset
             }
         }
 
-        private BodyFit BuildBodyFit()
+        private bool TryBuildBodyFit(GarmentSlot slot, out BodyFit bodyFit)
         {
+            bodyFit = default;
+            if (!HasPoint(LeftShoulder) || !HasPoint(RightShoulder))
+            {
+                return false;
+            }
+
             Vector3 shoulderCenter = ShoulderCenter();
             Vector3 hipCenter = HasPoint(LeftHip) && HasPoint(RightHip)
                 ? HipCenter()
                 : shoulderCenter + Vector3.down * Mathf.Max(0.8f, mappedHeight * 0.18f);
+            Vector3 torsoAxis = hipCenter - shoulderCenter;
+            if (torsoAxis.sqrMagnitude <= 0.0001f)
+            {
+                torsoAxis = Vector3.down * Mathf.Max(0.8f, mappedHeight * 0.18f);
+            }
+
             Vector3 kneeCenter = HasPoint(LeftKnee) && HasPoint(RightKnee)
                 ? (smoothedPoints[LeftKnee] + smoothedPoints[RightKnee]) * 0.5f
-                : hipCenter + (hipCenter - shoulderCenter);
+                : hipCenter + torsoAxis;
             Vector3 ankleCenter = HasPoint(LeftAnkle) && HasPoint(RightAnkle)
                 ? (smoothedPoints[LeftAnkle] + smoothedPoints[RightAnkle]) * 0.5f
-                : hipCenter + (hipCenter - shoulderCenter) * 1.85f;
+                : hipCenter + torsoAxis * 1.85f;
 
-            float shoulderWidth = Vector3.Distance(smoothedPoints[LeftShoulder], smoothedPoints[RightShoulder]);
+            float shoulderWidth = Mathf.Max(0.001f, Vector3.Distance(smoothedPoints[LeftShoulder], smoothedPoints[RightShoulder]));
             float hipWidth = HasPoint(LeftHip) && HasPoint(RightHip)
-                ? Vector3.Distance(smoothedPoints[LeftHip], smoothedPoints[RightHip])
-                : shoulderWidth * 0.78f;
+                ? Mathf.Max(0.001f, Vector3.Distance(smoothedPoints[LeftHip], smoothedPoints[RightHip]))
+                : shoulderWidth * 0.82f;
             float torsoHeight = Mathf.Max(0.001f, Vector3.Distance(shoulderCenter, hipCenter));
             float legHeight = Mathf.Max(0.001f, Vector3.Distance(hipCenter, ankleCenter));
             float dressHeight = Mathf.Max(torsoHeight * 1.55f, Vector3.Distance(shoulderCenter, kneeCenter));
 
+            Rect bodyBounds = BuildVisibleBodyBounds(slot);
+            float torsoBoundsWidth = bodyBounds.width > 0.001f
+                ? Mathf.Clamp(bodyBounds.width, shoulderWidth * 0.78f, shoulderWidth * 1.28f)
+                : shoulderWidth;
+            float structuralWidth = Mathf.Max(shoulderWidth, hipWidth * 0.9f);
+            float torsoWidth = Mathf.Lerp(structuralWidth, torsoBoundsWidth, Mathf.Clamp01(torsoBoundsWidthWeight));
+
             Vector3 shoulderVector = smoothedPoints[RightShoulder] - smoothedPoints[LeftShoulder];
             float tilt = Mathf.Atan2(shoulderVector.y, shoulderVector.x) * Mathf.Rad2Deg;
 
-            return new BodyFit
+            bodyFit = new BodyFit
             {
                 ShoulderCenter = shoulderCenter,
                 HipCenter = hipCenter,
@@ -796,16 +1227,88 @@ namespace ARCloset
                 AnkleCenter = ankleCenter,
                 ShoulderWidth = shoulderWidth,
                 HipWidth = hipWidth,
+                TorsoWidth = Mathf.Max(0.001f, torsoWidth),
                 TorsoHeight = torsoHeight,
                 LegHeight = legHeight,
                 DressHeight = dressHeight,
+                VisibleBodyBounds = bodyBounds,
                 Rotation = Quaternion.AngleAxis(Mathf.Clamp(tilt, -22f, 22f), Vector3.forward),
             };
+            return true;
+        }
+
+        private Rect BuildVisibleBodyBounds(GarmentSlot slot)
+        {
+            bool hasBounds = false;
+            float minX = 0f;
+            float maxX = 0f;
+            float minY = 0f;
+            float maxY = 0f;
+
+            EncapsulateBodyPoint(LeftShoulder, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+            EncapsulateBodyPoint(RightShoulder, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+            EncapsulateBodyPoint(LeftHip, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+            EncapsulateBodyPoint(RightHip, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+
+            if (slot == GarmentSlot.Lower || slot == GarmentSlot.OnePiece)
+            {
+                EncapsulateBodyPoint(LeftKnee, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+                EncapsulateBodyPoint(RightKnee, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+            }
+
+            if (slot == GarmentSlot.Lower)
+            {
+                EncapsulateBodyPoint(LeftAnkle, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+                EncapsulateBodyPoint(RightAnkle, ref hasBounds, ref minX, ref maxX, ref minY, ref maxY);
+            }
+
+            if (!hasBounds)
+            {
+                return new Rect(0f, 0f, 0f, 0f);
+            }
+
+            return Rect.MinMaxRect(minX, minY, maxX, maxY);
+        }
+
+        private void EncapsulateBodyPoint(int index, ref bool hasBounds, ref float minX, ref float maxX, ref float minY, ref float maxY)
+        {
+            if (!HasPoint(index))
+            {
+                return;
+            }
+
+            Vector3 point = smoothedPoints[index];
+            if (!hasBounds)
+            {
+                minX = maxX = point.x;
+                minY = maxY = point.y;
+                hasBounds = true;
+                return;
+            }
+
+            minX = Mathf.Min(minX, point.x);
+            maxX = Mathf.Max(maxX, point.x);
+            minY = Mathf.Min(minY, point.y);
+            maxY = Mathf.Max(maxY, point.y);
+        }
+
+        private bool TryGetHeldBodyFit(out BodyFit bodyFit)
+        {
+            if (hasLastReliableBodyFit &&
+                Time.realtimeSinceStartup - lastReliableBodyFitTime <= fitHoldSeconds)
+            {
+                bodyFit = lastReliableBodyFit;
+                return true;
+            }
+
+            bodyFit = default;
+            return false;
         }
 
         private void GetGarmentTarget(
             GarmentSlot slot,
             BodyFit bodyFit,
+            float verticalBias,
             out Vector3 targetCenter,
             out float targetWidth,
             out float targetHeight,
@@ -814,27 +1317,27 @@ namespace ARCloset
             switch (slot)
             {
                 case GarmentSlot.Lower:
-                    targetCenter = Vector3.Lerp(bodyFit.HipCenter, bodyFit.AnkleCenter, 0.48f);
+                    targetCenter = Vector3.Lerp(bodyFit.HipCenter, bodyFit.AnkleCenter, Mathf.Clamp01(0.48f + verticalBias));
                     targetWidth = Mathf.Max(bodyFit.HipWidth, bodyFit.ShoulderWidth * 0.58f) * lowerWidthPadding;
                     targetHeight = bodyFit.LegHeight * 1.04f;
                     heightBlend = 0.35f;
                     break;
                 case GarmentSlot.OnePiece:
-                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.KneeCenter, 0.52f);
-                    targetWidth = Mathf.Max(bodyFit.ShoulderWidth, bodyFit.HipWidth) * onePieceWidthPadding;
+                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.KneeCenter, Mathf.Clamp01(0.52f + verticalBias));
+                    targetWidth = Mathf.Max(bodyFit.TorsoWidth, bodyFit.HipWidth) * onePieceWidthPadding;
                     targetHeight = bodyFit.DressHeight * 1.05f;
                     heightBlend = 0.45f;
                     break;
                 case GarmentSlot.Outerwear:
-                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, 0.54f);
-                    targetWidth = Mathf.Max(bodyFit.ShoulderWidth, bodyFit.HipWidth * 0.92f) * outerwearWidthPadding;
+                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.54f + verticalBias));
+                    targetWidth = Mathf.Max(bodyFit.TorsoWidth, bodyFit.HipWidth * 0.92f) * outerwearWidthPadding;
                     targetHeight = bodyFit.TorsoHeight * 1.22f;
                     heightBlend = 0.2f;
                     break;
                 case GarmentSlot.Upper:
                 default:
-                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, 0.50f);
-                    targetWidth = Mathf.Max(bodyFit.ShoulderWidth, bodyFit.HipWidth * 0.86f) * upperWidthPadding;
+                    targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.50f + verticalBias));
+                    targetWidth = Mathf.Max(bodyFit.TorsoWidth, bodyFit.HipWidth * 0.86f) * upperWidthPadding;
                     targetHeight = bodyFit.TorsoHeight * 1.16f;
                     heightBlend = 0.18f;
                     break;
@@ -843,11 +1346,15 @@ namespace ARCloset
             targetCenter.z = overlayZ;
         }
 
-        private Vector3 GetGarmentAnchorTarget(GarmentSlot slot, BodyFit bodyFit)
+        private Vector3 GetGarmentAnchorTarget(GarmentSlot slot, BodyFit bodyFit, float verticalBias)
         {
-            Vector3 target = slot == GarmentSlot.Lower
-                ? bodyFit.HipCenter
-                : bodyFit.ShoulderCenter;
+            Vector3 target = slot switch
+            {
+                GarmentSlot.Lower => Vector3.Lerp(bodyFit.HipCenter, bodyFit.KneeCenter, Mathf.Clamp01(0.04f + verticalBias * 0.35f)),
+                GarmentSlot.OnePiece => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.07f + verticalBias * 0.35f)),
+                GarmentSlot.Outerwear => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.06f + verticalBias * 0.35f)),
+                _ => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.08f + verticalBias * 0.35f)),
+            };
             target.z = overlayZ;
             return target;
         }
@@ -859,9 +1366,11 @@ namespace ARCloset
             public Vector3 AnkleCenter;
             public float ShoulderWidth;
             public float HipWidth;
+            public float TorsoWidth;
             public float TorsoHeight;
             public float LegHeight;
             public float DressHeight;
+            public Rect VisibleBodyBounds;
             public Quaternion Rotation;
         }
 
@@ -952,7 +1461,16 @@ namespace ARCloset
             {
                 hasPoint[i] = false;
                 smoothedPoints[i] = Vector3.zero;
+                pointVelocities[i] = Vector3.zero;
+                missedPointFrames[i] = 0;
             }
+
+            lastPoseFilterTime = -1f;
+            ResetGarmentAnchorFilter();
+            ClearFitTarget();
+            hasLastReliableBodyFit = false;
+            lastReliableBodyFitTime = -1f;
+            HideFitDebugOverlay();
         }
 
         private Vector3 ShoulderCenter()
@@ -1001,6 +1519,7 @@ namespace ARCloset
             {
                 SetGarmentVisibility(!hideGarmentWhenPoseLost);
                 ResetRuntimeGarmentRig();
+                ClearFitTarget();
                 SetDynamicSleevesVisible(false);
                 SetDebugRigVisible(false);
             }

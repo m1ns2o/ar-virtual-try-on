@@ -6,9 +6,12 @@ namespace ARCloset
     public sealed class GarmentRuntimeRig : MonoBehaviour
     {
         [SerializeField] private GarmentSlot slot = GarmentSlot.Upper;
-        [SerializeField, Range(0f, 1f)] private float deformationBlend = 0.92f;
-        [SerializeField, Range(0f, 1f)] private float poseSmoothing = 0.42f;
-        [SerializeField, Range(0f, 1f)] private float zInfluence = 0.08f;
+        [SerializeField, Range(0f, 1f)] private float deformationBlend = 0.22f;
+        [SerializeField, Range(0f, 1f)] private float poseSmoothing = 0.18f;
+        [SerializeField, Range(0f, 1f)] private float zInfluence = 0.03f;
+        [SerializeField, Range(0f, 1f)] private float limbDeformationWeight = 0.38f;
+        [SerializeField, Range(0.5f, 1f)] private float minSegmentStretch = 0.82f;
+        [SerializeField, Range(1f, 1.8f)] private float maxSegmentStretch = 1.16f;
         [SerializeField] private bool updateNormals = true;
 
         private readonly List<RiggedMesh> riggedMeshes = new();
@@ -116,7 +119,7 @@ namespace ARCloset
             restFrame = RestFrame.FromBounds(restBoundsRoot, slot);
             foreach (RiggedMesh riggedMesh in riggedMeshes)
             {
-                riggedMesh.Bind(restFrame, slot);
+                riggedMesh.Bind(restFrame, slot, limbDeformationWeight);
             }
 
             initialized = true;
@@ -228,13 +231,13 @@ namespace ARCloset
 
             public Vector3[] RestRootVertices => restRootVertices;
 
-            public void Bind(RestFrame frame, GarmentSlot slot)
+            public void Bind(RestFrame frame, GarmentSlot slot, float limbWeight)
             {
                 restFrame = frame;
                 bindings = new VertexBinding[restRootVertices.Length];
                 for (int i = 0; i < restRootVertices.Length; i++)
                 {
-                    bindings[i] = VertexBinding.Create(restRootVertices[i], frame.Bounds, slot);
+                    bindings[i] = VertexBinding.Create(restRootVertices[i], frame.Bounds, slot, limbWeight);
                 }
             }
 
@@ -248,7 +251,12 @@ namespace ARCloset
                 for (int i = 0; i < restRootVertices.Length; i++)
                 {
                     Vector3 restRoot = restRootVertices[i];
-                    Vector3 deformedRoot = bindings[i].Apply(restRoot, restFrame, targetFrame);
+                    Vector3 deformedRoot = bindings[i].Apply(
+                        restRoot,
+                        restFrame,
+                        targetFrame,
+                        owner.minSegmentStretch,
+                        owner.maxSegmentStretch);
                     deformedRoot = Vector3.Lerp(restRoot, deformedRoot, blend);
                     deformedLocalVertices[i] = filter.transform.InverseTransformPoint(owner.transform.TransformPoint(deformedRoot));
                 }
@@ -285,29 +293,31 @@ namespace ARCloset
             private float rightThigh;
             private float rightCalf;
 
-            public static VertexBinding Create(Vector3 point, Bounds bounds, GarmentSlot slot)
+            public static VertexBinding Create(Vector3 point, Bounds bounds, GarmentSlot slot, float limbWeight)
             {
-                return slot == GarmentSlot.Lower ? CreateLower(point, bounds) : CreateUpperLike(point, bounds, slot);
+                return slot == GarmentSlot.Lower
+                    ? CreateLower(point, bounds, limbWeight)
+                    : CreateUpperLike(point, bounds, slot, limbWeight);
             }
 
-            public Vector3 Apply(Vector3 restPoint, RestFrame rest, TargetFrame target)
+            public Vector3 Apply(Vector3 restPoint, RestFrame rest, TargetFrame target, float minStretch, float maxStretch)
             {
                 Vector3 sum = Vector3.zero;
                 float total = 0f;
-                Add(torso, SegmentFrame.Transform(restPoint, rest.Torso, target.Torso), ref sum, ref total);
-                Add(hips, SegmentFrame.Transform(restPoint, rest.Hips, target.Hips), ref sum, ref total);
-                Add(leftUpperArm, SegmentFrame.Transform(restPoint, rest.LeftUpperArm, target.LeftUpperArm), ref sum, ref total);
-                Add(leftForearm, SegmentFrame.Transform(restPoint, rest.LeftForearm, target.LeftForearm), ref sum, ref total);
-                Add(rightUpperArm, SegmentFrame.Transform(restPoint, rest.RightUpperArm, target.RightUpperArm), ref sum, ref total);
-                Add(rightForearm, SegmentFrame.Transform(restPoint, rest.RightForearm, target.RightForearm), ref sum, ref total);
-                Add(leftThigh, SegmentFrame.Transform(restPoint, rest.LeftThigh, target.LeftThigh), ref sum, ref total);
-                Add(leftCalf, SegmentFrame.Transform(restPoint, rest.LeftCalf, target.LeftCalf), ref sum, ref total);
-                Add(rightThigh, SegmentFrame.Transform(restPoint, rest.RightThigh, target.RightThigh), ref sum, ref total);
-                Add(rightCalf, SegmentFrame.Transform(restPoint, rest.RightCalf, target.RightCalf), ref sum, ref total);
+                Add(torso, SegmentFrame.Transform(restPoint, rest.Torso, target.Torso, minStretch, maxStretch), ref sum, ref total);
+                Add(hips, SegmentFrame.Transform(restPoint, rest.Hips, target.Hips, minStretch, maxStretch), ref sum, ref total);
+                Add(leftUpperArm, SegmentFrame.Transform(restPoint, rest.LeftUpperArm, target.LeftUpperArm, minStretch, maxStretch), ref sum, ref total);
+                Add(leftForearm, SegmentFrame.Transform(restPoint, rest.LeftForearm, target.LeftForearm, minStretch, maxStretch), ref sum, ref total);
+                Add(rightUpperArm, SegmentFrame.Transform(restPoint, rest.RightUpperArm, target.RightUpperArm, minStretch, maxStretch), ref sum, ref total);
+                Add(rightForearm, SegmentFrame.Transform(restPoint, rest.RightForearm, target.RightForearm, minStretch, maxStretch), ref sum, ref total);
+                Add(leftThigh, SegmentFrame.Transform(restPoint, rest.LeftThigh, target.LeftThigh, minStretch, maxStretch), ref sum, ref total);
+                Add(leftCalf, SegmentFrame.Transform(restPoint, rest.LeftCalf, target.LeftCalf, minStretch, maxStretch), ref sum, ref total);
+                Add(rightThigh, SegmentFrame.Transform(restPoint, rest.RightThigh, target.RightThigh, minStretch, maxStretch), ref sum, ref total);
+                Add(rightCalf, SegmentFrame.Transform(restPoint, rest.RightCalf, target.RightCalf, minStretch, maxStretch), ref sum, ref total);
                 return total > 0.001f ? sum / total : restPoint;
             }
 
-            private static VertexBinding CreateUpperLike(Vector3 point, Bounds bounds, GarmentSlot slot)
+            private static VertexBinding CreateUpperLike(Vector3 point, Bounds bounds, GarmentSlot slot, float limbWeight)
             {
                 float width = Mathf.Max(0.001f, bounds.size.x);
                 float height = Mathf.Max(0.001f, bounds.size.y);
@@ -324,33 +334,34 @@ namespace ARCloset
                 float sleeveT = Mathf.InverseLerp(torsoHalf, halfWidth * 0.98f, absX);
                 float lowerBody = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.36f, 0.05f, y01));
                 float skirt = slot == GarmentSlot.OnePiece ? Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.48f, 0.08f, y01)) : 0f;
+                float armTorsoRelease = Mathf.Lerp(0.28f, 0.82f, Mathf.Clamp01(limbWeight));
 
                 VertexBinding binding = new VertexBinding
                 {
-                    torso = Mathf.Clamp01(1f - arm * 0.92f - lowerBody * 0.30f - skirt * 0.35f),
+                    torso = Mathf.Clamp01(1f - arm * armTorsoRelease - lowerBody * 0.22f - skirt * 0.28f),
                     hips = Mathf.Max(lowerBody * 0.30f, skirt * 0.50f),
                 };
 
                 if (point.x < centerX)
                 {
-                    binding.leftUpperArm = arm * (1f - sleeveT);
-                    binding.leftForearm = arm * sleeveT;
-                    binding.leftThigh = skirt * Mathf.Clamp01(1f - sleeveT * 0.35f) * 0.20f;
-                    binding.leftCalf = skirt * Mathf.Clamp01(sleeveT) * 0.12f;
+                    binding.leftUpperArm = arm * (1f - sleeveT) * limbWeight;
+                    binding.leftForearm = arm * sleeveT * limbWeight;
+                    binding.leftThigh = skirt * Mathf.Clamp01(1f - sleeveT * 0.35f) * 0.12f * limbWeight;
+                    binding.leftCalf = skirt * Mathf.Clamp01(sleeveT) * 0.08f * limbWeight;
                 }
                 else
                 {
-                    binding.rightUpperArm = arm * (1f - sleeveT);
-                    binding.rightForearm = arm * sleeveT;
-                    binding.rightThigh = skirt * Mathf.Clamp01(1f - sleeveT * 0.35f) * 0.20f;
-                    binding.rightCalf = skirt * Mathf.Clamp01(sleeveT) * 0.12f;
+                    binding.rightUpperArm = arm * (1f - sleeveT) * limbWeight;
+                    binding.rightForearm = arm * sleeveT * limbWeight;
+                    binding.rightThigh = skirt * Mathf.Clamp01(1f - sleeveT * 0.35f) * 0.12f * limbWeight;
+                    binding.rightCalf = skirt * Mathf.Clamp01(sleeveT) * 0.08f * limbWeight;
                 }
 
                 binding.Normalize();
                 return binding;
             }
 
-            private static VertexBinding CreateLower(Vector3 point, Bounds bounds)
+            private static VertexBinding CreateLower(Vector3 point, Bounds bounds, float limbWeight)
             {
                 float width = Mathf.Max(0.001f, bounds.size.x);
                 float centerX = bounds.center.x;
@@ -371,13 +382,13 @@ namespace ARCloset
                 float calf = lowerLeg * centerBlend;
                 if (point.x < centerX)
                 {
-                    binding.leftThigh = thigh;
-                    binding.leftCalf = calf;
+                    binding.leftThigh = thigh * limbWeight;
+                    binding.leftCalf = calf * limbWeight;
                 }
                 else
                 {
-                    binding.rightThigh = thigh;
-                    binding.rightCalf = calf;
+                    binding.rightThigh = thigh * limbWeight;
+                    binding.rightCalf = calf * limbWeight;
                 }
 
                 binding.Normalize();
@@ -574,10 +585,11 @@ namespace ARCloset
                 return From(Vector3.Lerp(a.Start, b.Start, t), Vector3.Lerp(a.End, b.End, t));
             }
 
-            public static Vector3 Transform(Vector3 point, SegmentFrame rest, SegmentFrame target)
+            public static Vector3 Transform(Vector3 point, SegmentFrame rest, SegmentFrame target, float minStretch, float maxStretch)
             {
                 Vector3 local = Quaternion.Inverse(rest.Rotation) * (point - rest.Start);
-                local.y *= target.Length / Mathf.Max(MinLength, rest.Length);
+                float stretch = target.Length / Mathf.Max(MinLength, rest.Length);
+                local.y *= Mathf.Clamp(stretch, minStretch, maxStretch);
                 return target.Start + target.Rotation * local;
             }
         }

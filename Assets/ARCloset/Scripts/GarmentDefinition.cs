@@ -12,5 +12,9 @@ namespace ARCloset
         public Vector3 localPositionOffset;
         public Vector3 localEulerOffset;
         public Vector3 localScale = Vector3.one;
+        public Vector2 fitAnchorOffset = Vector2.zero;
+        public float fitWidthMultiplier = 1.0f;
+        public float fitHeightMultiplier = 1.0f;
+        public float fitVerticalBias = 0.0f;
     }
 }
