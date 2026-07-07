@@ -1421,6 +1421,7 @@ GameObject:
   - component: {fileID: 1269336789}
   - component: {fileID: 1269336788}
   - component: {fileID: 1269336792}
+  - component: {fileID: 1269336793}
   m_Layer: 0
   m_Name: TrackingMannequin
   m_TagString: Untagged
@@ -1595,6 +1596,27 @@ MonoBehaviour:
   outputDirectory: PoseValidation
   logPassingWindows: 1
   showOverlay: 1
+--- !u!114 &1269336793
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1269336787}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fb00e78a2053e222a8c5e8642ccae0eb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fittingController: {fileID: 1269336790}
+  showControls: 1
+  colorCode: '#D94B6A'
+  controlsRect:
+    serializedVersion: 2
+    x: 18
+    y: 296
+    width: 380
+    height: 76
 --- !u!1 &1280505091
 GameObject:
   m_ObjectHideFlags: 0

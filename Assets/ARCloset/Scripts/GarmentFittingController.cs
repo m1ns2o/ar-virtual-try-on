@@ -299,6 +299,60 @@ namespace ARCloset
             return material != null;
         }
 
+        public bool ApplyCurrentGarmentColor(Color color)
+        {
+            if (currentGarment == null)
+            {
+                AdoptExistingEquippedGarment();
+            }
+
+            if (currentGarment == null)
+            {
+                return false;
+            }
+
+            bool applied = false;
+            foreach (Renderer renderer in currentGarment.GetComponentsInChildren<Renderer>(true))
+            {
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Material[] materials = renderer.materials;
+                for (int i = 0; i < materials.Length; i++)
+                {
+                    if (ApplyMaterialColor(materials[i], color))
+                    {
+                        applied = true;
+                    }
+                }
+            }
+
+            return applied;
+        }
+
+        private static bool ApplyMaterialColor(Material material, Color color)
+        {
+            if (material == null)
+            {
+                return false;
+            }
+
+            material.color = color;
+            if (material.HasProperty("_BaseColor"))
+            {
+                material.SetColor("_BaseColor", color);
+            }
+
+            if (material.HasProperty("_Color"))
+            {
+                material.SetColor("_Color", color);
+            }
+
+            return true;
+        }
+
         public void ApplyRuntimeRig(GarmentRuntimeRig.Pose pose)
         {
             if (currentGarment == null)

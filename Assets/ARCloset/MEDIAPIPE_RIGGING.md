@@ -46,6 +46,7 @@ Then open `Assets/ARCloset/Scenes/ARClosetDemo.unity` in Unity and press Play.
 - Arrow keys: Move the garment fit offset while debugging
 - `+` / `-`: Scale the garment fit while debugging
 - `Backspace`: Reset garment fit offset and scale
+- Color field: enter a `#RRGGBB` color code and press `Apply` to tint the equipped garment
 
 ## Data Path
 

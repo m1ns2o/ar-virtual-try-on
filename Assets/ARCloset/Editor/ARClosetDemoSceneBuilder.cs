@@ -187,6 +187,7 @@ namespace ARClosetEditor
 
             GarmentFittingController fittingController = mannequin.AddComponent<GarmentFittingController>();
             GarmentHotkeys hotkeys = mannequin.AddComponent<GarmentHotkeys>();
+            GarmentAppearanceController appearanceController = mannequin.AddComponent<GarmentAppearanceController>();
             MediaPipePoseRigDriver rigDriver = mannequin.AddComponent<MediaPipePoseRigDriver>();
             PoseFitStabilityMonitor stabilityMonitor = mannequin.AddComponent<PoseFitStabilityMonitor>();
             GarmentCatalog sceneCatalog = AssetDatabase.LoadAssetAtPath<GarmentCatalog>(CatalogFolder + "/DemoGarmentCatalog.asset");
@@ -207,6 +208,14 @@ namespace ARClosetEditor
             hotkeysObject.FindProperty("fittingController").objectReferenceValue = fittingController;
             hotkeysObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(hotkeys);
+
+            SerializedObject appearanceObject = new SerializedObject(appearanceController);
+            appearanceObject.Update();
+            appearanceObject.FindProperty("fittingController").objectReferenceValue = fittingController;
+            appearanceObject.FindProperty("showControls").boolValue = true;
+            appearanceObject.FindProperty("colorCode").stringValue = "#D94B6A";
+            appearanceObject.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(appearanceController);
 
             SerializedObject rigDriverObject = new SerializedObject(rigDriver);
             rigDriverObject.Update();
