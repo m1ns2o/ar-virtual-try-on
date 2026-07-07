@@ -15,6 +15,9 @@ MonoBehaviour:
   garmentId: mh-wool-pants
   displayName: MakeHuman Wool Pants
   slot: 1
+  author: MargaretToigo
+  license: CC0
+  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/pants01.html
   garmentPrefab: {fileID: 1283482589904753530, guid: 0ffcac5e476b55444984ef4d2c437b01, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}

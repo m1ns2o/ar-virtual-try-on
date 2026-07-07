@@ -15,6 +15,9 @@ MonoBehaviour:
   garmentId: mh-shift-dress
   displayName: MakeHuman Shift Dress
   slot: 2
+  author: MargaretToigo
+  license: CC0
+  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/dress01.html
   garmentPrefab: {fileID: 3668112607676057856, guid: 02f76af6fdb95eb49b1fc39156850226, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}

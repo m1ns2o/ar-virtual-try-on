@@ -15,6 +15,9 @@ MonoBehaviour:
   garmentId: mh-fisherman-sweater
   displayName: MakeHuman Fisherman Sweater
   slot: 0
+  author: MargaretToigo
+  license: CC0
+  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/shirts01.html
   garmentPrefab: {fileID: 7612876636929656692, guid: 828ef5a6021483f41b5301b2f06cf93a, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}

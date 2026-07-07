@@ -17,12 +17,13 @@ The runtime app then switches garments by loading a garment prefab and rebinding
 
 Use these as the first standardized examples:
 
-- T-shirt: upper-body garment
-- Hoodie: upper-body garment with hood volume
-- Dress: one-piece garment
-- Pants: lower-body garment for the second milestone
+- MakeHuman Polo Shirt: upper-body garment
+- MakeHuman Fisherman Sweater: upper-body garment
+- MakeHuman Wool Pants: lower-body garment
+- MakeHuman Shift Dress: one-piece garment sourced from the MakeHuman Community `dress01` CC0 pack
+- MakeHuman Kimono: outerwear garment
 
-The menu item `AR Closet/Create Demo Scene` creates a simple mannequin and placeholder prefabs for T-shirt, hoodie, and dress.
+The menu item `AR Closet/Create Demo Scene` creates a simple mannequin and MakeHuman garment prefabs for the catalog.
 
 ## Asset Sources To Evaluate
 

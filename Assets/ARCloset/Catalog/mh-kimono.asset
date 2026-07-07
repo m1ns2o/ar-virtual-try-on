@@ -15,6 +15,9 @@ MonoBehaviour:
   garmentId: mh-kimono
   displayName: MakeHuman Kimono
   slot: 3
+  author: Mindfront
+  license: CC0
+  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/dress01.html
   garmentPrefab: {fileID: 7202349924993232148, guid: 7a52060a37f99cc4780c9993462d3ef6, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}

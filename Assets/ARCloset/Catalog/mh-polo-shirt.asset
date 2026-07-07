@@ -15,6 +15,9 @@ MonoBehaviour:
   garmentId: mh-polo-shirt
   displayName: MakeHuman Polo Shirt
   slot: 0
+  author: namuhekam
+  license: CC0
+  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/shirts01.html
   garmentPrefab: {fileID: 6568253846515961823, guid: a65bce5d770139640973b023fa188caa, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}

@@ -438,9 +438,41 @@ namespace ARClosetEditor
             definition.slot = slot;
             definition.garmentPrefab = prefab;
             definition.localScale = Vector3.one;
+            ConfigureGarmentSourceMetadata(definition);
             ConfigureGarmentFitProfile(definition);
             EditorUtility.SetDirty(definition);
             return definition;
+        }
+
+        private static void ConfigureGarmentSourceMetadata(GarmentDefinition definition)
+        {
+            definition.author = string.Empty;
+            definition.license = "CC0";
+            definition.sourceUrl = string.Empty;
+
+            switch (definition.garmentId)
+            {
+                case "mh-polo-shirt":
+                    definition.author = "namuhekam";
+                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/shirts01.html";
+                    break;
+                case "mh-fisherman-sweater":
+                    definition.author = "MargaretToigo";
+                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/shirts01.html";
+                    break;
+                case "mh-wool-pants":
+                    definition.author = "MargaretToigo";
+                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/pants01.html";
+                    break;
+                case "mh-shift-dress":
+                    definition.author = "MargaretToigo";
+                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/dress01.html";
+                    break;
+                case "mh-kimono":
+                    definition.author = "Mindfront";
+                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/dress01.html";
+                    break;
+            }
         }
 
         private static void ConfigureGarmentFitProfile(GarmentDefinition definition)

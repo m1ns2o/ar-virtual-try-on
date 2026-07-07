@@ -8,6 +8,9 @@ namespace ARCloset
         public string garmentId = "garment-id";
         public string displayName = "Garment";
         public GarmentSlot slot = GarmentSlot.Upper;
+        public string author;
+        public string license;
+        public string sourceUrl;
         public GameObject garmentPrefab;
         public Vector3 localPositionOffset;
         public Vector3 localEulerOffset;
