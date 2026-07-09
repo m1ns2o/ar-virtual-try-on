@@ -4,6 +4,9 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/ARCloset/Scenes/ARClosetDemo.unity
+    guid: 71640993ce5fb3c44be7122336ea1bed
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0

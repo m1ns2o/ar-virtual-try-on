@@ -17,6 +17,30 @@ namespace ARCloset
         public GarmentDefinition CurrentDefinition { get; private set; }
         public GarmentSlot CurrentSlot => CurrentDefinition != null ? CurrentDefinition.slot : GarmentSlot.Upper;
         public Transform GarmentParent => garmentParent;
+        public int GarmentCount => catalog != null && catalog.garments != null ? catalog.garments.Count : 0;
+
+        public int CurrentGarmentIndex
+        {
+            get
+            {
+                if (catalog == null || catalog.garments == null || CurrentDefinition == null)
+                {
+                    return -1;
+                }
+
+                return catalog.garments.IndexOf(CurrentDefinition);
+            }
+        }
+
+        public GarmentDefinition GetGarmentDefinition(int index)
+        {
+            if (catalog == null || catalog.garments == null || index < 0 || index >= catalog.garments.Count)
+            {
+                return null;
+            }
+
+            return catalog.garments[index];
+        }
 
         private void Awake()
         {
@@ -474,7 +498,7 @@ namespace ARCloset
                         {
                             Bounds = bounds,
                             AnchorLocal = new Vector3(centerX, waistY, centerZ),
-                            FitWidth = width * Mathf.Lerp(0.82f, 0.94f, Mathf.InverseLerp(0.36f, 0.82f, aspect)),
+                            FitWidth = width * Mathf.Lerp(0.76f, 0.88f, Mathf.InverseLerp(0.36f, 0.82f, aspect)),
                             FitHeight = Mathf.Max(0.001f, waistY - minY),
                         };
                     }
@@ -485,7 +509,7 @@ namespace ARCloset
                         {
                             Bounds = bounds,
                             AnchorLocal = new Vector3(centerX, shoulderY, centerZ),
-                            FitWidth = width * EstimateTorsoWidthFraction(aspect, 0.74f, 0.52f),
+                            FitWidth = width * EstimateTorsoWidthFraction(aspect, 0.70f, 0.49f),
                             FitHeight = Mathf.Max(0.001f, shoulderY - minY),
                         };
                     }

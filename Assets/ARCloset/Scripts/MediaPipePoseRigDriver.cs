@@ -102,6 +102,11 @@ namespace ARCloset
         [SerializeField] private float lowerWidthPadding = 1.22f;
         [SerializeField] private float onePieceWidthPadding = 1.18f;
         [SerializeField] private float outerwearWidthPadding = 1.28f;
+        // MediaPipe hip landmarks are joint centers, not the visible lower-body silhouette.
+        [SerializeField, Range(1f, 1.8f)] private float lowerHipSilhouetteAllowance = 1.30f;
+        [SerializeField, Range(0.45f, 1.1f)] private float lowerTorsoWidthFloor = 0.68f;
+        [SerializeField, Range(1f, 1.8f)] private float onePieceHipSilhouetteAllowance = 1.26f;
+        [SerializeField, Range(0.75f, 1.25f)] private float onePieceLowerTorsoWidthFloor = 1.04f;
 
         [Header("Fit Debug")]
         [SerializeField] private bool showFitDebugOverlay = false;
@@ -1318,13 +1323,15 @@ namespace ARCloset
             {
                 case GarmentSlot.Lower:
                     targetCenter = Vector3.Lerp(bodyFit.HipCenter, bodyFit.AnkleCenter, Mathf.Clamp01(0.48f + verticalBias));
-                    targetWidth = Mathf.Max(bodyFit.HipWidth, bodyFit.ShoulderWidth * 0.58f) * lowerWidthPadding;
+                    targetWidth = EstimateLowerBodySilhouetteWidth(bodyFit, lowerHipSilhouetteAllowance, lowerTorsoWidthFloor) * lowerWidthPadding;
                     targetHeight = bodyFit.LegHeight * 1.04f;
                     heightBlend = 0.35f;
                     break;
                 case GarmentSlot.OnePiece:
                     targetCenter = Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.KneeCenter, Mathf.Clamp01(0.52f + verticalBias));
-                    targetWidth = Mathf.Max(bodyFit.TorsoWidth, bodyFit.HipWidth) * onePieceWidthPadding;
+                    targetWidth = Mathf.Max(
+                        bodyFit.TorsoWidth,
+                        EstimateLowerBodySilhouetteWidth(bodyFit, onePieceHipSilhouetteAllowance, onePieceLowerTorsoWidthFloor)) * onePieceWidthPadding;
                     targetHeight = bodyFit.DressHeight * 1.05f;
                     heightBlend = 0.45f;
                     break;
@@ -1344,6 +1351,14 @@ namespace ARCloset
             }
 
             targetCenter.z = overlayZ;
+        }
+
+        private float EstimateLowerBodySilhouetteWidth(BodyFit bodyFit, float hipAllowance, float torsoWidthFloor)
+        {
+            float hipSilhouetteWidth = bodyFit.HipWidth * Mathf.Max(1f, hipAllowance);
+            float torsoFloorWidth = bodyFit.TorsoWidth * Mathf.Clamp(torsoWidthFloor, 0f, 1.5f);
+            float shoulderFloorWidth = bodyFit.ShoulderWidth * Mathf.Clamp(torsoWidthFloor * 0.94f, 0f, 1.5f);
+            return Mathf.Max(0.001f, Mathf.Max(hipSilhouetteWidth, Mathf.Max(torsoFloorWidth, shoulderFloorWidth)));
         }
 
         private Vector3 GetGarmentAnchorTarget(GarmentSlot slot, BodyFit bodyFit, float verticalBias)

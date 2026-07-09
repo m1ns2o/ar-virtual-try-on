@@ -218,6 +218,8 @@ namespace ARClosetEditor
             appearanceObject.FindProperty("stripeWidthPixels").intValue = 8;
             appearanceObject.FindProperty("stripeGapPixels").intValue = 10;
             appearanceObject.FindProperty("verticalStripes").boolValue = true;
+            appearanceObject.FindProperty("toolbarWidth").floatValue = 360f;
+            appearanceObject.FindProperty("toolbarMargin").vector2Value = new Vector2(18f, 18f);
             appearanceObject.FindProperty("controlsRect").rectValue = new Rect(18f, 296f, 460f, 112f);
             appearanceObject.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(appearanceController);
@@ -264,6 +266,10 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("minMappedShoulderWidth").floatValue = 0.045f;
             rigDriverObject.FindProperty("torsoBoundsWidthWeight").floatValue = 0.35f;
             rigDriverObject.FindProperty("fitHoldSeconds").floatValue = 0.22f;
+            rigDriverObject.FindProperty("lowerHipSilhouetteAllowance").floatValue = 1.30f;
+            rigDriverObject.FindProperty("lowerTorsoWidthFloor").floatValue = 0.68f;
+            rigDriverObject.FindProperty("onePieceHipSilhouetteAllowance").floatValue = 1.26f;
+            rigDriverObject.FindProperty("onePieceLowerTorsoWidthFloor").floatValue = 1.04f;
             rigDriverObject.FindProperty("showFitDebugOverlay").boolValue = false;
             rigDriverObject.FindProperty("toggleFitDebugKey").intValue = (int)KeyCode.F;
             rigDriverObject.FindProperty("fitDebugZOffset").floatValue = -0.28f;
@@ -512,13 +518,13 @@ namespace ARClosetEditor
                     break;
                 case "mh-shift-dress":
                     definition.fitAnchorOffset = new Vector2(0f, -0.02f);
-                    definition.fitWidthMultiplier = 1.04f;
+                    definition.fitWidthMultiplier = 1.06f;
                     definition.fitHeightMultiplier = 1.05f;
                     definition.fitVerticalBias = 0.03f;
                     break;
                 case "mh-wool-pants":
                     definition.fitAnchorOffset = new Vector2(0f, -0.02f);
-                    definition.fitWidthMultiplier = 1.02f;
+                    definition.fitWidthMultiplier = 1.06f;
                     definition.fitHeightMultiplier = 1.03f;
                     definition.fitVerticalBias = 0.01f;
                     break;

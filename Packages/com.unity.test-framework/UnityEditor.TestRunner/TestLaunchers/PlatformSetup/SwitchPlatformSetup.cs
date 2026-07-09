@@ -14,7 +14,7 @@ namespace UnityEditor.TestTools.TestRunner
             EditorUserBuildSettings.switchNVNDrawValidation = true; // catches more graphics errors
 #endif
             EditorUserBuildSettings.development = true;
-            EditorUserBuildSettings.switchRedirectWritesToHostMount = true;
+            EditorUserBuildSettings.switchEnableHostIO = true;
 
             // We can use these when more debugging is required:
             //EditorUserBuildSettings.switchNVNDrawValidation = false; // cannot be used with shader debug

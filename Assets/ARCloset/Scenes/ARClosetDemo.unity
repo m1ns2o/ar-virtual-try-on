@@ -1512,6 +1512,10 @@ MonoBehaviour:
   lowerWidthPadding: 1.22
   onePieceWidthPadding: 1.18
   outerwearWidthPadding: 1.28
+  lowerHipSilhouetteAllowance: 1.3
+  lowerTorsoWidthFloor: 0.68
+  onePieceHipSilhouetteAllowance: 1.26
+  onePieceLowerTorsoWidthFloor: 1.04
   showFitDebugOverlay: 0
   toggleFitDebugKey: 102
   fitDebugZOffset: -0.28
