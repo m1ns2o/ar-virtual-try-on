@@ -52,7 +52,7 @@ namespace ARCloset
         [SerializeField] private bool previewMirrored = true;
         [SerializeField] private bool stopLivePoseSourceWhilePlaying = true;
         [SerializeField] private bool restoreLivePoseSourceOnStop = true;
-        [SerializeField] private bool showOverlay = true;
+        [SerializeField] private bool showOverlay;
 
         private bool isPlaying;
         private float startedAt;
@@ -346,7 +346,7 @@ namespace ARCloset
             }
 
             livePoseSource.enabled = liveSourceWasEnabled;
-            if (liveSourceWasEnabled && liveSourceWasRunning)
+            if (liveSourceWasEnabled && liveSourceWasRunning && livePoseSource.isActiveAndEnabled)
             {
                 livePoseSource.StartSource();
             }

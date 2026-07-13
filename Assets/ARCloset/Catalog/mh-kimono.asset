@@ -22,7 +22,7 @@ MonoBehaviour:
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}
   localScale: {x: 1, y: 1, z: 1}
-  fitAnchorOffset: {x: 0, y: -0.02}
+  fitAnchorOffset: {x: 0, y: 0}
   fitWidthMultiplier: 1.14
   fitHeightMultiplier: 1.04
   fitVerticalBias: 0.02

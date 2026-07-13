@@ -10,19 +10,19 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 07e70c444e5ab6145a79773c27465797, type: 3}
-  m_Name: mh-shift-dress
+  m_Name: mh-short-sleeve-qipao
   m_EditorClassIdentifier: 
-  garmentId: mh-shift-dress
-  displayName: MakeHuman Shift Dress
+  garmentId: mh-short-sleeve-qipao
+  displayName: MakeHuman High-Neck Short-Sleeve Dress
   slot: 2
-  author: MargaretToigo
-  license: CC0
-  sourceUrl: https://static.makehumancommunity.org/assets/assetpacks/dress01.html
-  garmentPrefab: {fileID: 3668112607676057856, guid: 02f76af6fdb95eb49b1fc39156850226, type: 3}
+  author: Elvaerwyn
+  license: CC-BY
+  sourceUrl: http://www.makehumancommunity.org/node/1526
+  garmentPrefab: {fileID: 7279869800342710739, guid: 3d85c1fc74e746b4c8c6bbd76d2b19c9, type: 3}
   localPositionOffset: {x: 0, y: 0, z: 0}
   localEulerOffset: {x: 0, y: 0, z: 0}
   localScale: {x: 1, y: 1, z: 1}
-  fitAnchorOffset: {x: 0, y: 0}
-  fitWidthMultiplier: 1.06
-  fitHeightMultiplier: 1.05
-  fitVerticalBias: 0.03
+  fitAnchorOffset: {x: 0, y: 0.06}
+  fitWidthMultiplier: 1.04
+  fitHeightMultiplier: 1.02
+  fitVerticalBias: 0.01

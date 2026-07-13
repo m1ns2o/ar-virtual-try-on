@@ -40,6 +40,8 @@ namespace ARCloset
         [SerializeField] private bool autoSwitchFlatCameraFeed = true;
         [SerializeField] private KeyCode cycleCameraKey = KeyCode.C;
         [SerializeField] private KeyCode mirrorVideoAndInputKey = KeyCode.M;
+        [SerializeField] private bool showDebugOverlay;
+        [SerializeField] private KeyCode toggleDebugOverlayKey = KeyCode.F3;
         [SerializeField] private float flatCameraVarianceThreshold = 300f;
         [SerializeField] private float emptyCameraMeanEdgeThreshold = 22f;
         [SerializeField] private float flatCameraAutoSwitchSeconds = 4f;
@@ -77,6 +79,7 @@ namespace ARCloset
         public bool IsRunning => runCoroutine != null;
         public string Status => status;
         public string ActiveDeviceName => activeDeviceName;
+        public bool IsMirrored => mirrorPreview;
 
         private void Awake()
         {
@@ -123,6 +126,11 @@ namespace ARCloset
             if (Input.GetKeyDown(mirrorVideoAndInputKey))
             {
                 SetVideoAndInputMirrored(!mirrorPreview);
+            }
+
+            if (Input.GetKeyDown(toggleDebugOverlayKey))
+            {
+                showDebugOverlay = !showDebugOverlay;
             }
         }
 
@@ -1157,6 +1165,11 @@ namespace ARCloset
 
         private void OnGUI()
         {
+            if (!showDebugOverlay)
+            {
+                return;
+            }
+
             GUI.Label(new UnityEngine.Rect(18f, 42f, 560f, 28f), status);
             GUI.Label(new UnityEngine.Rect(18f, 66f, 900f, 28f), $"Camera: {activeDeviceName}  mirror:{(mirrorPreview ? "ON" : "OFF")}  rawRot:{NormalizedVideoRotationDegrees()}  displayRot:{DisplayRotationDegrees()}  videoVFlip:{IsVideoVerticallyFlipped()}");
 

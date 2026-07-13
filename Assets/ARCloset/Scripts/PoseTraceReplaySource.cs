@@ -30,7 +30,7 @@ namespace ARCloset
         [SerializeField, Range(1, 12)] private int maxCatchUpFramesPerUpdate = 4;
         [SerializeField] private bool stopLivePoseSourceWhileReplaying = true;
         [SerializeField] private bool restoreLivePoseSourceOnStop = true;
-        [SerializeField] private bool showOverlay = true;
+        [SerializeField] private bool showOverlay;
 
         private readonly List<MediaPipePosePacket> packets = new();
         private bool isReplaying;

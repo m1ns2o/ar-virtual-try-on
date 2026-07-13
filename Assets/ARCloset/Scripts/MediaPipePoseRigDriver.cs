@@ -57,8 +57,10 @@ namespace ARCloset
         [SerializeField, Range(0.1f, 5f)] private float maxAnchorJumpDistance = 0.9f;
 
         [Header("Rig")]
-        [SerializeField] private bool showDebugRig = true;
+        [SerializeField] private bool showDebugRig;
+        [SerializeField] private bool showDebugOverlay;
         [SerializeField] private KeyCode toggleDebugRigKey = KeyCode.D;
+        [SerializeField] private KeyCode toggleDebugOverlayKey = KeyCode.F3;
         [SerializeField] private KeyCode mirrorOverlayKey = KeyCode.X;
         [SerializeField] private float debugRigZOffset = -0.35f;
         [SerializeField] private Transform rigRoot;
@@ -98,10 +100,10 @@ namespace ARCloset
         [SerializeField] private Vector2 fitOffset = Vector2.zero;
         [SerializeField] private float keyboardOffsetStep = 0.04f;
         [SerializeField] private float keyboardScaleStep = 0.04f;
-        [SerializeField] private float upperWidthPadding = 1.18f;
+        [SerializeField] private float upperWidthPadding = 1.36f;
         [SerializeField] private float lowerWidthPadding = 1.22f;
-        [SerializeField] private float onePieceWidthPadding = 1.18f;
-        [SerializeField] private float outerwearWidthPadding = 1.28f;
+        [SerializeField] private float onePieceWidthPadding = 1.30f;
+        [SerializeField] private float outerwearWidthPadding = 1.42f;
         // MediaPipe hip landmarks are joint centers, not the visible lower-body silhouette.
         [SerializeField, Range(1f, 1.8f)] private float lowerHipSilhouetteAllowance = 1.30f;
         [SerializeField, Range(0.45f, 1.1f)] private float lowerTorsoWidthFloor = 0.68f;
@@ -187,6 +189,11 @@ namespace ARCloset
 
         private void HandleDebugInput()
         {
+            if (Input.GetKeyDown(toggleDebugOverlayKey))
+            {
+                showDebugOverlay = !showDebugOverlay;
+            }
+
             if (Input.GetKeyDown(toggleDebugRigKey))
             {
                 showDebugRig = !showDebugRig;
@@ -640,6 +647,14 @@ namespace ARCloset
             if (clampGarmentTargetToCamera)
             {
                 Vector3 clampedCenter = ClampTargetCenterToCamera(targetCenter, clampWidth, clampHeight);
+                // Tops and dresses must stay locked to the MediaPipe shoulder line.
+                // A tall mesh may extend beyond the viewport, but vertically clamping
+                // its bounds would move the neckline and shoulder seam away from the
+                // tracked shoulders. The web renderer already preserves this anchor.
+                if (slot != GarmentSlot.Lower)
+                {
+                    clampedCenter.y = targetCenter.y;
+                }
                 targetPosition += clampedCenter - targetCenter;
                 targetCenter = clampedCenter;
             }
@@ -1366,9 +1381,11 @@ namespace ARCloset
             Vector3 target = slot switch
             {
                 GarmentSlot.Lower => Vector3.Lerp(bodyFit.HipCenter, bodyFit.KneeCenter, Mathf.Clamp01(0.04f + verticalBias * 0.35f)),
-                GarmentSlot.OnePiece => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.07f + verticalBias * 0.35f)),
-                GarmentSlot.Outerwear => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.06f + verticalBias * 0.35f)),
-                _ => Vector3.Lerp(bodyFit.ShoulderCenter, bodyFit.HipCenter, Mathf.Clamp01(0.08f + verticalBias * 0.35f)),
+                // Tops use the actual MediaPipe shoulder line. Vertical bias controls
+                // garment length/center only and must not pull the neckline downward.
+                GarmentSlot.OnePiece => bodyFit.ShoulderCenter,
+                GarmentSlot.Outerwear => bodyFit.ShoulderCenter,
+                _ => bodyFit.ShoulderCenter,
             };
             target.z = overlayZ;
             return target;
@@ -1525,7 +1542,7 @@ namespace ARCloset
 
         private void OnGUI()
         {
-            if (receiver == null)
+            if (!showDebugOverlay || receiver == null)
             {
                 return;
             }

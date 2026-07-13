@@ -1469,8 +1469,10 @@ MonoBehaviour:
   scaleSmoothTime: 0.26
   maxScaleSpeed: 1.8
   maxAnchorJumpDistance: 0.9
-  showDebugRig: 1
+  showDebugRig: 0
+  showDebugOverlay: 0
   toggleDebugRigKey: 100
+  toggleDebugOverlayKey: 284
   mirrorOverlayKey: 120
   debugRigZOffset: -0.35
   rigRoot: {fileID: 1242625124}
@@ -1508,10 +1510,10 @@ MonoBehaviour:
   fitOffset: {x: 0, y: 0}
   keyboardOffsetStep: 0.04
   keyboardScaleStep: 0.04
-  upperWidthPadding: 1.18
+  upperWidthPadding: 1.36
   lowerWidthPadding: 1.22
-  onePieceWidthPadding: 1.18
-  outerwearWidthPadding: 1.28
+  onePieceWidthPadding: 1.3
+  outerwearWidthPadding: 1.42
   lowerHipSilhouetteAllowance: 1.3
   lowerTorsoWidthFloor: 0.68
   onePieceHipSilhouetteAllowance: 1.26
@@ -1599,7 +1601,7 @@ MonoBehaviour:
   writeCsv: 1
   outputDirectory: PoseValidation
   logPassingWindows: 1
-  showOverlay: 1
+  showOverlay: 0
 --- !u!114 &1269336793
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1613,12 +1615,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fittingController: {fileID: 1269336790}
+  poseSource: {fileID: 0}
   showControls: 1
   colorCode: '#D94B6A'
   stripeColorCode: '#FFFFFF'
   stripeWidthPixels: 8
   stripeGapPixels: 10
   verticalStripes: 1
+  toolbarWidth: 360
+  toolbarMargin: {x: 18, y: 18}
   controlsRect:
     serializedVersion: 2
     x: 18
@@ -2286,6 +2291,8 @@ MonoBehaviour:
   autoSwitchFlatCameraFeed: 0
   cycleCameraKey: 99
   mirrorVideoAndInputKey: 109
+  showDebugOverlay: 0
+  toggleDebugOverlayKey: 284
   flatCameraVarianceThreshold: 300
   emptyCameraMeanEdgeThreshold: 22
   flatCameraAutoSwitchSeconds: 4
@@ -2364,7 +2371,7 @@ MonoBehaviour:
   previewMirrored: 1
   stopLivePoseSourceWhilePlaying: 1
   restoreLivePoseSourceOnStop: 1
-  showOverlay: 1
+  showOverlay: 0
 --- !u!114 &1650484781
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2393,7 +2400,7 @@ MonoBehaviour:
   maxCatchUpFramesPerUpdate: 4
   stopLivePoseSourceWhileReplaying: 1
   restoreLivePoseSourceOnStop: 1
-  showOverlay: 1
+  showOverlay: 0
 --- !u!114 &1650484782
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2413,7 +2420,7 @@ MonoBehaviour:
   fileNamePrefix: pose-trace
   onlyRecordFreshPose: 1
   onlyRecordNewSequence: 1
-  showOverlay: 1
+  showOverlay: 0
 --- !u!1 &1925440216
 GameObject:
   m_ObjectHideFlags: 0

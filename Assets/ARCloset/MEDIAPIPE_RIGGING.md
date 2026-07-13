@@ -33,8 +33,8 @@ Then open `Assets/ARCloset/Scenes/ARClosetDemo.unity` in Unity and press Play.
 - `1`: Polo shirt
 - `2`: Fisherman sweater
 - `3`: Wool pants
-- `4`: Shift dress
-- `5`: Kimono
+- `4`: Short-sleeve flapper dress
+- `5`: High-neck short-sleeve dress
 - `C`: Switch webcam device
 - `D`: Toggle the debug skeleton overlay
 - `M`: Mirror the webcam preview and MediaPipe input together
@@ -74,7 +74,8 @@ The selected MakeHuman garment is aligned by its renderer bounds, not by the pre
 The current garments are OBJ meshes, so the base garment still uses pose-driven overlay alignment and garment anchoring. To demonstrate arm-following rig behavior, the scene also creates a dynamic sleeve rig:
 
 - T-shirts show upper-arm sleeve segments.
-- Long-sleeve garments such as sweaters, kimonos, jackets, coats, and hoodies show upper-arm and forearm sleeve segments.
+- Short-sleeve dresses show upper-arm sleeve segments.
+- Long-sleeve garments such as sweaters, jackets, coats, and hoodies show upper-arm and forearm sleeve segments.
 - Sleeve transforms are driven by shoulder, elbow, and wrist landmarks and reuse the current garment material.
 
 This is a rigging MVP, not full cloth simulation. Production-quality sleeve bending should replace the procedural sleeve overlay with skinned garment meshes bound to the tracked rig, or a cloth simulation layer on top of the current landmark fit.

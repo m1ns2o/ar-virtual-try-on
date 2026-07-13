@@ -13,6 +13,7 @@ namespace ARClosetEditor
         private const string CatalogFolder = RootFolder + "/Catalog";
         private const string ScenesFolder = RootFolder + "/Scenes";
         private const string MakeHumanFolder = RootFolder + "/MakeHuman";
+        private static readonly Vector3 FrontFacingEuler = new Vector3(0f, 180f, 0f);
 
         [MenuItem("AR Closet/Create Demo Scene")]
         public static void CreateDemoScene()
@@ -25,43 +26,43 @@ namespace ARClosetEditor
             Material poloMaterial = CreateTexturedMaterial("M_MH_PoloShirt", new Color(0.62f, 0.82f, 0.96f), MakeHumanFolder + "/PoloShirt/Polo_Base_Color.png");
             Material sweaterMaterial = CreateTexturedMaterial("M_MH_FishermanSweater", new Color(0.36f, 0.43f, 0.52f), MakeHumanFolder + "/FishermanSweater/shirt-knit.png");
             Material pantsMaterial = CreateTexturedMaterial("M_MH_WoolPants", new Color(0.20f, 0.24f, 0.30f), MakeHumanFolder + "/WoolPants/Pants_wool.png");
-            Material dressMaterial = CreateTexturedMaterial("M_MH_ShiftDress", new Color(0.74f, 0.18f, 0.24f), MakeHumanFolder + "/ShiftDress/ShiftDress.png");
-            Material kimonoMaterial = CreateTexturedMaterial("M_MH_Kimono", new Color(0.52f, 0.38f, 0.78f), MakeHumanFolder + "/Kimono/F_Kimono_COL.png");
+            Material flapperDressMaterial = CreateSolidMaterial("M_MH_FlapperDress", new Color(0.47f, 0.61f, 0.51f));
+            Material qipaoMaterial = CreateSolidMaterial("M_MH_ShortSleeveQipao", new Color(0.60f, 0.47f, 0.56f));
 
             GameObject poloPrefab = CreateMakeHumanPrefab(
                 "PF_MH_PoloShirt",
                 MakeHumanFolder + "/PoloShirt/Polo_t-shirt.obj",
                 poloMaterial,
                 new Vector3(0f, -0.34f, 0f),
-                Vector3.zero,
+                FrontFacingEuler,
                 Vector3.one * 0.22f);
             GameObject sweaterPrefab = CreateMakeHumanPrefab(
                 "PF_MH_FishermanSweater",
                 MakeHumanFolder + "/FishermanSweater/sweater_fisherman.obj",
                 sweaterMaterial,
                 new Vector3(0f, -0.34f, 0f),
-                Vector3.zero,
+                FrontFacingEuler,
                 Vector3.one * 0.22f);
             GameObject pantsPrefab = CreateMakeHumanPrefab(
                 "PF_MH_WoolPants",
                 MakeHumanFolder + "/WoolPants/pants_wool.obj",
                 pantsMaterial,
                 new Vector3(0f, 0.08f, 0f),
-                Vector3.zero,
+                FrontFacingEuler,
                 Vector3.one * 0.22f);
-            GameObject shiftDressPrefab = CreateMakeHumanPrefab(
-                "PF_MH_ShiftDress",
-                MakeHumanFolder + "/ShiftDress/dress_shift.obj",
-                dressMaterial,
+            GameObject flapperDressPrefab = CreateMakeHumanPrefab(
+                "PF_MH_FlapperDress",
+                MakeHumanFolder + "/FlapperDress/flapper_dress_1.obj",
+                flapperDressMaterial,
                 new Vector3(0f, 0.03f, 0f),
-                Vector3.zero,
+                FrontFacingEuler,
                 Vector3.one * 0.22f);
-            GameObject kimonoPrefab = CreateMakeHumanPrefab(
-                "PF_MH_Kimono",
-                MakeHumanFolder + "/Kimono/f_kimono.obj",
-                kimonoMaterial,
-                new Vector3(0f, 0.16f, 0f),
-                Vector3.zero,
+            GameObject qipaoPrefab = CreateMakeHumanPrefab(
+                "PF_MH_ShortSleeveQipao",
+                MakeHumanFolder + "/ShortSleeveQipao/westernized_quipoa.obj",
+                qipaoMaterial,
+                new Vector3(0f, 0.03f, 0f),
+                FrontFacingEuler,
                 Vector3.one * 0.22f);
 
             GarmentCatalog catalog = LoadOrCreateCatalog();
@@ -69,8 +70,8 @@ namespace ARClosetEditor
             catalog.garments.Add(CreateGarmentDefinition("mh-polo-shirt", "MakeHuman Polo Shirt", GarmentSlot.Upper, poloPrefab));
             catalog.garments.Add(CreateGarmentDefinition("mh-fisherman-sweater", "MakeHuman Fisherman Sweater", GarmentSlot.Upper, sweaterPrefab));
             catalog.garments.Add(CreateGarmentDefinition("mh-wool-pants", "MakeHuman Wool Pants", GarmentSlot.Lower, pantsPrefab));
-            catalog.garments.Add(CreateGarmentDefinition("mh-shift-dress", "MakeHuman Shift Dress", GarmentSlot.OnePiece, shiftDressPrefab));
-            catalog.garments.Add(CreateGarmentDefinition("mh-kimono", "MakeHuman Kimono", GarmentSlot.Outerwear, kimonoPrefab));
+            catalog.garments.Add(CreateGarmentDefinition("mh-flapper-dress", "MakeHuman Short-Sleeve Flapper Dress", GarmentSlot.OnePiece, flapperDressPrefab));
+            catalog.garments.Add(CreateGarmentDefinition("mh-short-sleeve-qipao", "MakeHuman High-Neck Short-Sleeve Dress", GarmentSlot.OnePiece, qipaoPrefab));
             EditorUtility.SetDirty(catalog);
             AssetDatabase.SaveAssets();
             GarmentDefinition initialGarment = catalog.garments.Count > 0 ? catalog.garments[0] : null;
@@ -233,7 +234,7 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("overlayCamera").objectReferenceValue = overlayCamera;
             rigDriverObject.FindProperty("mapToCameraViewport").boolValue = true;
             rigDriverObject.FindProperty("mirrorX").boolValue = false;
-            rigDriverObject.FindProperty("showDebugRig").boolValue = true;
+            rigDriverObject.FindProperty("showDebugRig").boolValue = false;
             rigDriverObject.FindProperty("debugRigZOffset").floatValue = -0.35f;
             rigDriverObject.FindProperty("smoothing").floatValue = 0.75f;
             rigDriverObject.FindProperty("landmarkSmoothTime").floatValue = 0.045f;
@@ -255,6 +256,9 @@ namespace ARClosetEditor
             rigDriverObject.FindProperty("clampGarmentTargetToCamera").boolValue = true;
             rigDriverObject.FindProperty("fitScaleMultiplier").floatValue = 1.0f;
             rigDriverObject.FindProperty("fitOffset").vector2Value = Vector2.zero;
+            rigDriverObject.FindProperty("upperWidthPadding").floatValue = 1.36f;
+            rigDriverObject.FindProperty("onePieceWidthPadding").floatValue = 1.30f;
+            rigDriverObject.FindProperty("outerwearWidthPadding").floatValue = 1.42f;
             rigDriverObject.FindProperty("minGarmentScale").floatValue = 0.12f;
             rigDriverObject.FindProperty("maxGarmentScale").floatValue = 8.0f;
             rigDriverObject.FindProperty("minFitVisibility").floatValue = 0.24f;
@@ -408,6 +412,18 @@ namespace ARClosetEditor
             return material;
         }
 
+        private static Material CreateSolidMaterial(string name, Color color)
+        {
+            Material material = CreateMaterial(name, color);
+            material.SetTexture("_BaseMap", null);
+            material.SetTexture("_MainTex", null);
+            material.SetTexture("_BumpMap", null);
+            material.SetTexture("_NormalMap", null);
+            material.DisableKeyword("_NORMALMAP");
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
         private static Material CreateTransparentMaterial(string name, Color color)
         {
             Material material = CreateMaterial(name, color);
@@ -484,13 +500,14 @@ namespace ARClosetEditor
                     definition.author = "MargaretToigo";
                     definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/pants01.html";
                     break;
-                case "mh-shift-dress":
-                    definition.author = "MargaretToigo";
+                case "mh-flapper-dress":
+                    definition.author = "Aethelraed_Unraed";
                     definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/dress01.html";
                     break;
-                case "mh-kimono":
-                    definition.author = "Mindfront";
-                    definition.sourceUrl = "https://static.makehumancommunity.org/assets/assetpacks/dress01.html";
+                case "mh-short-sleeve-qipao":
+                    definition.author = "Elvaerwyn";
+                    definition.license = "CC-BY";
+                    definition.sourceUrl = "http://www.makehumancommunity.org/node/1526";
                     break;
             }
         }
@@ -505,22 +522,21 @@ namespace ARClosetEditor
             switch (definition.garmentId)
             {
                 case "mh-fisherman-sweater":
-                    definition.fitAnchorOffset = new Vector2(0f, -0.03f);
                     definition.fitWidthMultiplier = 1.06f;
                     definition.fitHeightMultiplier = 1.02f;
                     definition.fitVerticalBias = 0.02f;
                     break;
-                case "mh-kimono":
-                    definition.fitAnchorOffset = new Vector2(0f, -0.02f);
-                    definition.fitWidthMultiplier = 1.14f;
-                    definition.fitHeightMultiplier = 1.04f;
-                    definition.fitVerticalBias = 0.02f;
+                case "mh-flapper-dress":
+                    definition.fitAnchorOffset = new Vector2(0f, 0.06f);
+                    definition.fitWidthMultiplier = 1.08f;
+                    definition.fitHeightMultiplier = 1.03f;
+                    definition.fitVerticalBias = 0.01f;
                     break;
-                case "mh-shift-dress":
-                    definition.fitAnchorOffset = new Vector2(0f, -0.02f);
-                    definition.fitWidthMultiplier = 1.06f;
-                    definition.fitHeightMultiplier = 1.05f;
-                    definition.fitVerticalBias = 0.03f;
+                case "mh-short-sleeve-qipao":
+                    definition.fitAnchorOffset = new Vector2(0f, 0.06f);
+                    definition.fitWidthMultiplier = 1.04f;
+                    definition.fitHeightMultiplier = 1.02f;
+                    definition.fitVerticalBias = 0.01f;
                     break;
                 case "mh-wool-pants":
                     definition.fitAnchorOffset = new Vector2(0f, -0.02f);

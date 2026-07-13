@@ -8,29 +8,37 @@ namespace ARCloset
 {
     public sealed class GarmentAppearanceController : MonoBehaviour
     {
-        private static readonly Color PanelColor = new(0.07f, 0.08f, 0.11f, 0.94f);
-        private static readonly Color CardColor = new(0.12f, 0.14f, 0.18f, 0.98f);
-        private static readonly Color FieldColor = new(0.055f, 0.06f, 0.08f, 1f);
-        private static readonly Color MutedFieldColor = new(0.16f, 0.18f, 0.23f, 1f);
-        private static readonly Color AccentColor = new(0.93f, 0.28f, 0.42f, 1f);
-        private static readonly Color SecondaryAccentColor = new(0.1f, 0.68f, 0.78f, 1f);
-        private static readonly Color TextColor = new(0.94f, 0.96f, 0.98f, 1f);
-        private static readonly Color MutedTextColor = new(0.58f, 0.64f, 0.72f, 1f);
+        private static readonly Color PanelColor = new(0.055f, 0.06f, 0.058f, 0.97f);
+        private static readonly Color CardColor = new(0.115f, 0.125f, 0.12f, 0.98f);
+        private static readonly Color FieldColor = new(0.035f, 0.04f, 0.038f, 1f);
+        private static readonly Color MutedFieldColor = new(0.19f, 0.205f, 0.198f, 1f);
+        private static readonly Color AccentColor = new(1f, 0.31f, 0.34f, 1f);
+        private static readonly Color SecondaryAccentColor = new(0.2f, 0.8f, 0.61f, 1f);
+        private static readonly Color TextColor = new(0.97f, 0.96f, 0.92f, 1f);
+        private static readonly Color MutedTextColor = new(0.68f, 0.7f, 0.67f, 1f);
+        private static readonly Color WarningColor = new(1f, 0.72f, 0.25f, 1f);
 
         [SerializeField] private GarmentFittingController fittingController;
+        [SerializeField] private MediaPipeUnityPoseSource poseSource;
         [SerializeField] private bool showControls = true;
         [SerializeField] private string colorCode = "#D94B6A";
         [SerializeField] private string stripeColorCode = "#FFFFFF";
         [SerializeField, Range(2, 64)] private int stripeWidthPixels = 8;
         [SerializeField, Range(2, 64)] private int stripeGapPixels = 10;
         [SerializeField] private bool verticalStripes = true;
-        [SerializeField, Range(300f, 440f)] private float toolbarWidth = 360f;
-        [SerializeField] private Vector2 toolbarMargin = new(18f, 18f);
+        [SerializeField, Range(360f, 460f)] private float toolbarWidth = 396f;
+        [SerializeField] private Vector2 toolbarMargin = new(12f, 12f);
         [SerializeField, HideInInspector] private Rect controlsRect = new(18f, 296f, 460f, 112f);
 
         private readonly List<Button> garmentButtons = new();
         private readonly List<Image> garmentButtonImages = new();
         private readonly List<Text> garmentButtonLabels = new();
+
+        private enum ColorTarget
+        {
+            Garment,
+            Stripe,
+        }
 
         private GarmentDefinition lastDefinition;
         private bool hasAppliedColor;
@@ -48,16 +56,27 @@ namespace ARCloset
         private Font uiFont;
         private Text currentGarmentLabel;
         private Text statusLabel;
+        private Text trackingLabel;
+        private Text cameraLabel;
+        private Text garmentColorTargetLabel;
+        private Text stripeColorTargetLabel;
         private Text stripeToggleLabel;
-        private Text directionLabel;
+        private Text verticalDirectionLabel;
+        private Text horizontalDirectionLabel;
+        private Text mirrorToggleLabel;
         private Text stripeWidthValueLabel;
         private Text stripeGapValueLabel;
         private InputField colorInput;
-        private InputField stripeInput;
         private Image colorSwatch;
         private Image stripeSwatch;
         private Slider stripeWidthSlider;
         private Slider stripeGapSlider;
+        private Image trackingDot;
+        private RuntimeColorPicker colorPicker;
+        private Toggle stripeToggle;
+        private Toggle mirrorToggle;
+        private ColorTarget activeColorTarget;
+        private bool suppressPickerCallback;
 
         public string ColorCode
         {
@@ -67,6 +86,7 @@ namespace ARCloset
 
         public string Status => status;
         public bool StripeEnabled => stripeEnabled;
+        private string ActiveColorCode => activeColorTarget == ColorTarget.Garment ? colorCode : stripeColorCode;
 
         private void Reset()
         {
@@ -78,6 +98,11 @@ namespace ARCloset
             if (fittingController == null)
             {
                 fittingController = GetComponent<GarmentFittingController>();
+            }
+
+            if (poseSource == null)
+            {
+                poseSource = FindFirstObjectByType<MediaPipeUnityPoseSource>();
             }
         }
 
@@ -342,18 +367,59 @@ namespace ARCloset
             panelShadow.effectDistance = new Vector2(-8f, -8f);
 
             VerticalLayoutGroup panelLayout = toolbarPanel.gameObject.AddComponent<VerticalLayoutGroup>();
-            panelLayout.padding = new RectOffset(12, 12, 12, 12);
-            panelLayout.spacing = 10f;
+            panelLayout.padding = new RectOffset(14, 14, 14, 14);
+            panelLayout.spacing = 8f;
             panelLayout.childAlignment = TextAnchor.UpperCenter;
             panelLayout.childControlWidth = true;
-            panelLayout.childControlHeight = false;
+            panelLayout.childControlHeight = true;
             panelLayout.childForceExpandWidth = true;
             panelLayout.childForceExpandHeight = false;
 
             CreateHeader(toolbarPanel);
-            CreateGarmentSection(toolbarPanel);
-            CreateColorSection(toolbarPanel);
-            CreatePatternSection(toolbarPanel);
+
+            RectTransform scrollRoot = CreateRect(toolbarPanel, "ControlsScroll");
+            LayoutElement scrollLayout = scrollRoot.gameObject.AddComponent<LayoutElement>();
+            scrollLayout.minHeight = 100f;
+            scrollLayout.flexibleHeight = 1f;
+
+            ScrollRect scrollRect = scrollRoot.gameObject.AddComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.scrollSensitivity = 26f;
+
+            RectTransform viewport = CreateRect(scrollRoot, "Viewport");
+            Stretch(viewport, 0f, 0f, 0f, 0f);
+            Image viewportImage = viewport.gameObject.AddComponent<Image>();
+            viewportImage.color = new Color(0f, 0f, 0f, 0.001f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            RectTransform content = CreateRect(viewport, "Content");
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0.5f, 1f);
+            content.anchoredPosition = Vector2.zero;
+            content.sizeDelta = Vector2.zero;
+
+            VerticalLayoutGroup contentLayout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 8f;
+            contentLayout.childAlignment = TextAnchor.UpperCenter;
+            contentLayout.childControlWidth = true;
+            contentLayout.childControlHeight = true;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+
+            ContentSizeFitter contentFitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            contentFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scrollRect.viewport = viewport;
+            scrollRect.content = content;
+
+            CreateCameraSection(content);
+            CreateGarmentSection(content);
+            CreateColorSection(content);
+            CreatePatternSection(content);
             RefreshToolbarState(true);
         }
 
@@ -364,7 +430,9 @@ namespace ARCloset
                 return;
             }
 
-            toolbarScaler.scaleFactor = Mathf.Clamp(Screen.height / 900f, 0.48f, 1f);
+            float heightScale = Screen.height / 600f;
+            float widthScale = Screen.width / 1000f;
+            toolbarScaler.scaleFactor = Mathf.Clamp(Mathf.Min(heightScale, widthScale), 0.7f, 1.05f);
         }
 
         private void DestroyToolbar()
@@ -378,16 +446,29 @@ namespace ARCloset
             toolbarScaler = null;
             currentGarmentLabel = null;
             statusLabel = null;
+            trackingLabel = null;
+            cameraLabel = null;
+            garmentColorTargetLabel = null;
+            stripeColorTargetLabel = null;
             stripeToggleLabel = null;
-            directionLabel = null;
+            verticalDirectionLabel = null;
+            horizontalDirectionLabel = null;
+            mirrorToggleLabel = null;
             stripeWidthValueLabel = null;
             stripeGapValueLabel = null;
             colorInput = null;
-            stripeInput = null;
             colorSwatch = null;
             stripeSwatch = null;
             stripeWidthSlider = null;
             stripeGapSlider = null;
+            trackingDot = null;
+            stripeToggle = null;
+            mirrorToggle = null;
+            if (colorPicker != null)
+            {
+                colorPicker.ColorChanged -= HandlePickerColorChanged;
+            }
+            colorPicker = null;
 
             if (toolbarRoot == null)
             {
@@ -410,42 +491,71 @@ namespace ARCloset
         {
             RectTransform header = CreateRect(parent, "Header");
             LayoutElement layout = header.gameObject.AddComponent<LayoutElement>();
-            layout.minHeight = 58f;
-            layout.preferredHeight = 58f;
+            layout.minHeight = 88f;
+            layout.preferredHeight = 88f;
 
             VerticalLayoutGroup group = header.gameObject.AddComponent<VerticalLayoutGroup>();
-            group.spacing = 3f;
-            group.childControlHeight = false;
+            group.spacing = 4f;
+            group.childControlHeight = true;
             group.childControlWidth = true;
             group.childForceExpandWidth = true;
+            group.childForceExpandHeight = false;
 
-            Text title = CreateText(header, "AR Closet", 19, FontStyle.Bold, TextColor, TextAnchor.MiddleLeft);
-            title.rectTransform.sizeDelta = new Vector2(0f, 26f);
+            Text title = CreateText(header, "AR CLOSET", 20, FontStyle.Bold, TextColor, TextAnchor.MiddleLeft);
+            title.rectTransform.sizeDelta = new Vector2(0f, 28f);
 
-            Text subtitle = CreateText(header, "Garment settings", 12, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft);
-            subtitle.rectTransform.sizeDelta = new Vector2(0f, 18f);
+            RectTransform trackingRow = CreateRow(header, "TrackingStatus", 20f, 8f);
+            RectTransform dotRect = CreateRect(trackingRow, "TrackingDot");
+            LayoutElement dotLayout = dotRect.gameObject.AddComponent<LayoutElement>();
+            dotLayout.minWidth = 10f;
+            dotLayout.preferredWidth = 10f;
+            dotLayout.minHeight = 10f;
+            dotLayout.preferredHeight = 10f;
+            trackingDot = dotRect.gameObject.AddComponent<Image>();
+            trackingDot.color = WarningColor;
+
+            trackingLabel = CreateText(trackingRow, "Starting camera", 12, FontStyle.Bold, MutedTextColor, TextAnchor.MiddleLeft);
+            statusLabel = CreateText(header, status, 11, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft);
+            statusLabel.rectTransform.sizeDelta = new Vector2(0f, 18f);
 
             RectTransform line = CreateRect(header, "AccentLine");
             LayoutElement lineLayout = line.gameObject.AddComponent<LayoutElement>();
-            lineLayout.minHeight = 4f;
-            lineLayout.preferredHeight = 4f;
+            lineLayout.minHeight = 3f;
+            lineLayout.preferredHeight = 3f;
             Image lineImage = line.gameObject.AddComponent<Image>();
-            lineImage.color = SecondaryAccentColor;
+            lineImage.color = AccentColor;
+        }
+
+        private void CreateCameraSection(Transform parent)
+        {
+            RectTransform card = CreateCard(parent, "CameraSection", 88f);
+            CreateSectionTitle(card, "Camera");
+
+            RectTransform row = CreateRow(card, "CameraControls", 42f, 8f);
+            cameraLabel = CreateText(row, "Camera", 12, FontStyle.Normal, TextColor, TextAnchor.MiddleLeft);
+            CreateButton(row, "Switch", MutedFieldColor, CycleCameraFromToolbar, 76f, 40f);
+            mirrorToggle = CreateToggle(
+                row,
+                "Mirror",
+                poseSource == null || poseSource.IsMirrored,
+                SetMirrorFromToolbar,
+                out mirrorToggleLabel,
+                100f);
         }
 
         private void CreateGarmentSection(Transform parent)
         {
-            RectTransform card = CreateCard(parent, "GarmentCard", 94f);
+            RectTransform card = CreateCard(parent, "GarmentSection", 206f);
             CreateSectionTitle(card, "Garment");
-            currentGarmentLabel = CreateText(card, "Current: none", 13, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft);
-            currentGarmentLabel.rectTransform.sizeDelta = new Vector2(0f, 20f);
+            currentGarmentLabel = CreateText(card, "Selected: none", 13, FontStyle.Bold, TextColor, TextAnchor.MiddleLeft);
+            currentGarmentLabel.rectTransform.sizeDelta = new Vector2(0f, 22f);
 
             garmentListRoot = CreateRect(card, "GarmentList");
             GridLayoutGroup grid = garmentListRoot.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(Mathf.Max(32f, (toolbarWidth - 84f) / 5f), 26f);
-            grid.spacing = new Vector2(4f, 4f);
+            grid.cellSize = new Vector2(Mathf.Max(120f, (toolbarWidth - 66f) / 2f), 40f);
+            grid.spacing = new Vector2(6f, 6f);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 5;
+            grid.constraintCount = 2;
             grid.childAlignment = TextAnchor.UpperLeft;
             garmentListLayout = garmentListRoot.gameObject.AddComponent<LayoutElement>();
 
@@ -454,48 +564,129 @@ namespace ARCloset
 
         private void CreateColorSection(Transform parent)
         {
-            RectTransform card = CreateCard(parent, "ColorCard", 116f);
+            RectTransform card = CreateCard(parent, "ColorSection", 318f);
             CreateSectionTitle(card, "Color");
 
-            RectTransform row = CreateRow(card, "ColorInputRow", 36f, 8f);
-            colorSwatch = CreateSwatch(row, "BaseColorSwatch", colorCode);
-            colorInput = CreateInput(row, "BaseColorInput", colorCode);
-            colorInput.onEndEdit.AddListener(value =>
-            {
-                colorCode = value;
-                RefreshColorPreview(colorSwatch, colorCode);
-            });
-            CreateButton(row, "Apply", AccentColor, ApplyBaseColorFromToolbar, 72f);
+            RectTransform targetRow = CreateRow(card, "ColorTarget", 40f, 6f);
+            garmentColorTargetLabel = CreateButton(
+                targetRow,
+                "Garment",
+                AccentColor,
+                () => SetActiveColorTarget(ColorTarget.Garment),
+                0f,
+                40f);
+            stripeColorTargetLabel = CreateButton(
+                targetRow,
+                "Stripe",
+                MutedFieldColor,
+                () => SetActiveColorTarget(ColorTarget.Stripe),
+                0f,
+                40f);
 
-            RectTransform presets = CreateRow(card, "ColorPresets", 30f, 8f);
-            string[] presetColors = { "#D94B6A", "#2D9CDB", "#27AE60", "#F2C94C", "#8E44AD", "#F7F9FB" };
+            CreateColorPicker(card);
+
+            RectTransform inputRow = CreateRow(card, "ColorInputRow", 40f, 8f);
+            colorSwatch = CreateSwatch(inputRow, "ActiveColorSwatch", colorCode);
+            colorInput = CreateInput(inputRow, "ActiveColorInput", colorCode);
+            colorInput.onEndEdit.AddListener(ApplyActiveColorCode);
+
+            RectTransform presets = CreateRow(card, "ColorPresets", 34f, 7f);
+            string[] presetColors =
+            {
+                "#FF5A5F",
+                "#3A86FF",
+                "#2EC4B6",
+                "#70C66B",
+                "#FFBE0B",
+                "#9B5DE5",
+                "#F6F2EA",
+            };
             foreach (string preset in presetColors)
             {
                 CreateSwatchButton(presets, preset, () => ApplyColorPreset(preset));
             }
         }
 
+        private void CreateColorPicker(Transform parent)
+        {
+            RectTransform pickerRow = CreateRow(parent, "ColorPicker", 132f, 10f);
+
+            RectTransform saturationValueRect = CreateRect(pickerRow, "SaturationValue");
+            LayoutElement saturationValueLayout = saturationValueRect.gameObject.AddComponent<LayoutElement>();
+            saturationValueLayout.minWidth = 220f;
+            saturationValueLayout.minHeight = 128f;
+            saturationValueLayout.preferredHeight = 128f;
+            saturationValueLayout.flexibleWidth = 1f;
+            RawImage saturationValueImage = saturationValueRect.gameObject.AddComponent<RawImage>();
+            saturationValueImage.color = Color.white;
+
+            RectTransform saturationValueMarker = CreateRect(saturationValueRect, "Selection");
+            saturationValueMarker.sizeDelta = new Vector2(14f, 14f);
+            Image saturationValueMarkerImage = saturationValueMarker.gameObject.AddComponent<Image>();
+            saturationValueMarkerImage.color = Color.white;
+            saturationValueMarkerImage.raycastTarget = false;
+            Outline saturationValueOutline = saturationValueMarker.gameObject.AddComponent<Outline>();
+            saturationValueOutline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            saturationValueOutline.effectDistance = new Vector2(2f, -2f);
+
+            RectTransform hueRect = CreateRect(pickerRow, "Hue");
+            LayoutElement hueLayout = hueRect.gameObject.AddComponent<LayoutElement>();
+            hueLayout.minWidth = 24f;
+            hueLayout.preferredWidth = 24f;
+            hueLayout.minHeight = 128f;
+            hueLayout.preferredHeight = 128f;
+            RawImage hueImage = hueRect.gameObject.AddComponent<RawImage>();
+            hueImage.color = Color.white;
+
+            RectTransform hueMarker = CreateRect(hueRect, "Selection");
+            hueMarker.sizeDelta = new Vector2(32f, 4f);
+            Image hueMarkerImage = hueMarker.gameObject.AddComponent<Image>();
+            hueMarkerImage.color = Color.white;
+            hueMarkerImage.raycastTarget = false;
+            Outline hueOutline = hueMarker.gameObject.AddComponent<Outline>();
+            hueOutline.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            hueOutline.effectDistance = new Vector2(1f, -1f);
+
+            colorPicker = pickerRow.gameObject.AddComponent<RuntimeColorPicker>();
+            colorPicker.Initialize(saturationValueImage, saturationValueMarker, hueImage, hueMarker);
+            colorPicker.ColorChanged += HandlePickerColorChanged;
+            if (TryParseHexColor(colorCode, out Color initialColor))
+            {
+                colorPicker.SetColor(initialColor);
+            }
+        }
+
         private void CreatePatternSection(Transform parent)
         {
-            RectTransform card = CreateCard(parent, "PatternCard", 184f);
+            RectTransform card = CreateCard(parent, "PatternSection", 220f);
             CreateSectionTitle(card, "Pattern");
 
-            RectTransform stripeRow = CreateRow(card, "StripeInputRow", 36f, 8f);
-            stripeSwatch = CreateSwatch(stripeRow, "StripeColorSwatch", stripeColorCode);
-            stripeInput = CreateInput(stripeRow, "StripeColorInput", stripeColorCode);
-            stripeInput.onEndEdit.AddListener(value =>
-            {
-                stripeColorCode = value;
-                RefreshColorPreview(stripeSwatch, stripeColorCode);
-            });
-            CreateButton(stripeRow, "Apply", SecondaryAccentColor, ApplyStripeFromToolbar, 72f);
+            stripeToggle = CreateToggle(
+                card,
+                "Use stripes",
+                stripeEnabled,
+                SetStripeEnabledFromToolbar,
+                out stripeToggleLabel);
 
-            RectTransform actionRow = CreateRow(card, "PatternActions", 34f, 8f);
-            stripeToggleLabel = CreateButton(actionRow, "Enable Stripes", MutedFieldColor, ToggleStripePattern, 0f);
-            directionLabel = CreateButton(actionRow, "Vertical", MutedFieldColor, ToggleStripeDirection, 0f);
+            RectTransform directionRow = CreateRow(card, "StripeDirection", 40f, 6f);
+            CreateText(directionRow, "Direction", 12, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft, 72f);
+            verticalDirectionLabel = CreateButton(
+                directionRow,
+                "Vertical",
+                SecondaryAccentColor,
+                () => SetStripeDirection(true),
+                0f,
+                40f);
+            horizontalDirectionLabel = CreateButton(
+                directionRow,
+                "Horizontal",
+                MutedFieldColor,
+                () => SetStripeDirection(false),
+                0f,
+                40f);
 
             RectTransform widthRow = CreateRow(card, "StripeWidth", 30f, 10f);
-            CreateText(widthRow, "Width", 13, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft, 48f);
+            CreateText(widthRow, "Width", 12, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft, 52f);
             stripeWidthSlider = CreateSlider(widthRow, "StripeWidthSlider", 2f, 64f, stripeWidthPixels);
             stripeWidthValueLabel = CreateText(widthRow, stripeWidthPixels.ToString(), 13, FontStyle.Bold, TextColor, TextAnchor.MiddleRight, 32f);
             stripeWidthSlider.onValueChanged.AddListener(value =>
@@ -506,7 +697,7 @@ namespace ARCloset
             });
 
             RectTransform gapRow = CreateRow(card, "StripeGap", 30f, 10f);
-            CreateText(gapRow, "Gap", 13, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft, 48f);
+            CreateText(gapRow, "Spacing", 12, FontStyle.Normal, MutedTextColor, TextAnchor.MiddleLeft, 52f);
             stripeGapSlider = CreateSlider(gapRow, "StripeGapSlider", 2f, 64f, stripeGapPixels);
             stripeGapValueLabel = CreateText(gapRow, stripeGapPixels.ToString(), 13, FontStyle.Bold, TextColor, TextAnchor.MiddleRight, 32f);
             stripeGapSlider.onValueChanged.AddListener(value =>
@@ -550,8 +741,8 @@ namespace ARCloset
 
             if (garmentListLayout != null)
             {
-                int rows = Mathf.CeilToInt(garmentCount / 5f);
-                float height = rows * 26f + Mathf.Max(0, rows - 1) * 4f;
+                int rows = Mathf.CeilToInt(garmentCount / 2f);
+                float height = rows * 40f + Mathf.Max(0, rows - 1) * 6f;
                 garmentListLayout.minHeight = height;
                 garmentListLayout.preferredHeight = height;
             }
@@ -559,7 +750,9 @@ namespace ARCloset
             for (int i = 0; i < garmentCount; i++)
             {
                 int index = i;
-                Text label = CreateButton(garmentListRoot, (i + 1).ToString(), MutedFieldColor, () => EquipGarmentFromToolbar(index), 0f, 26f);
+                GarmentDefinition definition = fittingController.GetGarmentDefinition(i);
+                string labelText = ShortGarmentName(definition, i);
+                Text label = CreateButton(garmentListRoot, labelText, MutedFieldColor, () => EquipGarmentFromToolbar(index), 0f, 40f);
                 Button button = label.GetComponentInParent<Button>();
                 Image image = button != null ? button.GetComponent<Image>() : null;
                 if (button != null && image != null)
@@ -588,7 +781,7 @@ namespace ARCloset
                 string currentName = fittingController != null && fittingController.CurrentDefinition != null
                     ? fittingController.CurrentDefinition.displayName
                     : "none";
-                currentGarmentLabel.text = $"Current: {currentName}";
+                currentGarmentLabel.text = $"Selected: {currentName}";
             }
 
             int currentIndex = fittingController != null ? fittingController.CurrentGarmentIndex : -1;
@@ -609,21 +802,44 @@ namespace ARCloset
                 }
             }
 
-            RefreshInputField(colorInput, colorCode, forceTextFields);
-            RefreshInputField(stripeInput, stripeColorCode, forceTextFields);
-            RefreshColorPreview(colorSwatch, colorCode);
+            string activeCode = ActiveColorCode;
+            RefreshInputField(colorInput, activeCode, forceTextFields);
+            RefreshColorPreview(colorSwatch, activeCode);
             RefreshColorPreview(stripeSwatch, stripeColorCode);
+
+            Color garmentTargetColor = activeColorTarget == ColorTarget.Garment ? AccentColor : MutedFieldColor;
+            Color stripeTargetColor = activeColorTarget == ColorTarget.Stripe ? SecondaryAccentColor : MutedFieldColor;
+            SetButtonColor(garmentColorTargetLabel, garmentTargetColor);
+            SetButtonColor(stripeColorTargetLabel, stripeTargetColor);
+
+            if (forceTextFields && colorPicker != null && TryParseHexColor(activeCode, out Color pickerColor))
+            {
+                suppressPickerCallback = true;
+                colorPicker.SetColor(pickerColor);
+                suppressPickerCallback = false;
+            }
+
+            if (stripeToggle != null && stripeToggle.isOn != stripeEnabled)
+            {
+                stripeToggle.SetIsOnWithoutNotify(stripeEnabled);
+            }
 
             if (stripeToggleLabel != null)
             {
-                stripeToggleLabel.text = stripeEnabled ? "Disable Stripes" : "Enable Stripes";
-                SetButtonColor(stripeToggleLabel, stripeEnabled ? SecondaryAccentColor : MutedFieldColor);
+                stripeToggleLabel.color = stripeEnabled ? TextColor : MutedTextColor;
             }
 
-            if (directionLabel != null)
+            SetButtonColor(verticalDirectionLabel, verticalStripes ? SecondaryAccentColor : MutedFieldColor);
+            SetButtonColor(horizontalDirectionLabel, verticalStripes ? MutedFieldColor : SecondaryAccentColor);
+
+            if (mirrorToggle != null && poseSource != null && mirrorToggle.isOn != poseSource.IsMirrored)
             {
-                directionLabel.text = verticalStripes ? "Vertical" : "Horizontal";
-                SetButtonColor(directionLabel, verticalStripes ? SecondaryAccentColor : MutedFieldColor);
+                mirrorToggle.SetIsOnWithoutNotify(poseSource.IsMirrored);
+            }
+
+            if (mirrorToggleLabel != null)
+            {
+                mirrorToggleLabel.color = poseSource != null && poseSource.IsMirrored ? TextColor : MutedTextColor;
             }
 
             if (stripeWidthSlider != null && !Mathf.Approximately(stripeWidthSlider.value, stripeWidthPixels))
@@ -637,6 +853,7 @@ namespace ARCloset
             }
 
             UpdateStripeValueLabels();
+            UpdateTrackingState();
             SetStatus(status);
         }
 
@@ -659,57 +876,118 @@ namespace ARCloset
 
         private void ApplyBaseColorFromToolbar()
         {
-            if (colorInput != null)
-            {
-                colorCode = colorInput.text;
-            }
-
-            TryApplyColorCode(colorCode, out _);
+            ApplyActiveColorCode(colorInput != null ? colorInput.text : ActiveColorCode);
         }
 
         private void ApplyColorPreset(string code)
         {
-            colorCode = code;
-            RefreshInputField(colorInput, colorCode, true);
-            TryApplyColorCode(colorCode, out _);
+            ApplyActiveColorCode(code);
         }
 
         private void ApplyStripeFromToolbar()
         {
-            if (colorInput != null)
-            {
-                colorCode = colorInput.text;
-            }
-
-            if (stripeInput != null)
-            {
-                stripeColorCode = stripeInput.text;
-            }
-
             TryApplyStripePattern(out _);
         }
 
-        private void ToggleStripePattern()
+        private void ApplyActiveColorCode(string code)
         {
+            if (activeColorTarget == ColorTarget.Garment)
+            {
+                TryApplyColorCode(code, out _);
+                return;
+            }
+
+            if (!TryParseHexColor(code, out Color color))
+            {
+                status = "Invalid stripe color";
+                RefreshToolbarState(true);
+                return;
+            }
+
+            stripeColorCode = NormalizeHexColor(color);
+            appliedStripeColor = color;
             if (stripeEnabled)
             {
-                ClearStripePattern(out _);
+                TryApplyStripePattern(colorCode, stripeColorCode, out _);
             }
             else
             {
-                ApplyStripeFromToolbar();
+                status = $"Stripe color {stripeColorCode}";
+                RefreshToolbarState(true);
             }
         }
 
-        private void ToggleStripeDirection()
+        private void HandlePickerColorChanged(Color color)
         {
-            verticalStripes = !verticalStripes;
-            if (stripeEnabled)
+            if (suppressPickerCallback)
             {
-                TryApplyStripePattern(out _);
+                return;
             }
 
+            ApplyActiveColorCode(NormalizeHexColor(color));
+        }
+
+        private void SetActiveColorTarget(ColorTarget target)
+        {
+            if (activeColorTarget == target)
+            {
+                return;
+            }
+
+            activeColorTarget = target;
             RefreshToolbarState(true);
+        }
+
+        private void SetStripeEnabledFromToolbar(bool enabled)
+        {
+            if (enabled == stripeEnabled)
+            {
+                return;
+            }
+
+            if (enabled)
+            {
+                ApplyStripeFromToolbar();
+            }
+            else
+            {
+                ClearStripePattern(out _);
+            }
+        }
+
+        private void SetStripeDirection(bool vertical)
+        {
+            if (verticalStripes == vertical)
+            {
+                return;
+            }
+
+            verticalStripes = vertical;
+            ApplyLiveStripeIfEnabled();
+            RefreshToolbarState(false);
+        }
+
+        private void CycleCameraFromToolbar()
+        {
+            if (poseSource == null)
+            {
+                status = "Camera source unavailable";
+                return;
+            }
+
+            poseSource.CycleCameraDevice();
+            status = "Switching camera";
+        }
+
+        private void SetMirrorFromToolbar(bool mirrored)
+        {
+            if (poseSource == null)
+            {
+                return;
+            }
+
+            poseSource.SetVideoAndInputMirrored(mirrored);
+            status = mirrored ? "Mirror on" : "Mirror off";
         }
 
         private void ApplyLiveStripeIfEnabled()
@@ -717,6 +995,70 @@ namespace ARCloset
             if (stripeEnabled)
             {
                 TryApplyStripePattern(out _);
+            }
+        }
+
+        private void UpdateTrackingState()
+        {
+            if (poseSource == null)
+            {
+                poseSource = FindFirstObjectByType<MediaPipeUnityPoseSource>();
+            }
+
+            if (poseSource == null)
+            {
+                if (trackingLabel != null)
+                {
+                    trackingLabel.text = "Camera unavailable";
+                }
+
+                if (trackingDot != null)
+                {
+                    trackingDot.color = AccentColor;
+                }
+
+                return;
+            }
+
+            string rawStatus = poseSource.Status ?? string.Empty;
+            string normalized = rawStatus.ToLowerInvariant();
+            string label;
+            Color indicator;
+            if (normalized.Contains("tracking"))
+            {
+                label = "Pose tracking";
+                indicator = SecondaryAccentColor;
+            }
+            else if (normalized.Contains("searching"))
+            {
+                label = "Finding pose";
+                indicator = WarningColor;
+            }
+            else if (normalized.Contains("error") || normalized.Contains("denied") || normalized.Contains("unavailable") || normalized.Contains("missing"))
+            {
+                label = "Camera issue";
+                indicator = AccentColor;
+            }
+            else
+            {
+                label = "Starting camera";
+                indicator = WarningColor;
+            }
+
+            if (trackingLabel != null)
+            {
+                trackingLabel.text = label;
+                trackingLabel.color = indicator;
+            }
+
+            if (trackingDot != null)
+            {
+                trackingDot.color = indicator;
+            }
+
+            if (cameraLabel != null)
+            {
+                cameraLabel.text = ShortCameraName(poseSource.ActiveDeviceName);
             }
         }
 
@@ -812,7 +1154,7 @@ namespace ARCloset
             group.spacing = 7f;
             group.childAlignment = TextAnchor.UpperCenter;
             group.childControlWidth = true;
-            group.childControlHeight = false;
+            group.childControlHeight = true;
             group.childForceExpandWidth = true;
             group.childForceExpandHeight = false;
 
@@ -832,7 +1174,7 @@ namespace ARCloset
             group.childControlWidth = true;
             group.childControlHeight = true;
             group.childForceExpandWidth = false;
-            group.childForceExpandHeight = true;
+            group.childForceExpandHeight = false;
 
             LayoutElement layout = row.gameObject.AddComponent<LayoutElement>();
             layout.minHeight = height;
@@ -907,6 +1249,62 @@ namespace ARCloset
             text.resizeTextMaxSize = 13;
             Stretch(text.rectTransform, 10f, 4f, 10f, 4f);
             return text;
+        }
+
+        private Toggle CreateToggle(
+            Transform parent,
+            string labelValue,
+            bool initialValue,
+            Action<bool> onChanged,
+            out Text label,
+            float fixedWidth = 0f)
+        {
+            RectTransform rect = CreateRect(parent, labelValue.Replace(" ", string.Empty) + "Toggle");
+            Image background = rect.gameObject.AddComponent<Image>();
+            background.color = MutedFieldColor;
+
+            Toggle toggle = rect.gameObject.AddComponent<Toggle>();
+            toggle.targetGraphic = background;
+            toggle.colors = CreateButtonColors(MutedFieldColor);
+
+            LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
+            layout.minHeight = 40f;
+            layout.preferredHeight = 40f;
+            if (fixedWidth > 0f)
+            {
+                layout.minWidth = fixedWidth;
+                layout.preferredWidth = fixedWidth;
+                layout.flexibleWidth = 0f;
+            }
+            else
+            {
+                layout.flexibleWidth = 1f;
+            }
+
+            RectTransform box = CreateRect(rect, "Box");
+            box.anchorMin = new Vector2(0f, 0.5f);
+            box.anchorMax = new Vector2(0f, 0.5f);
+            box.pivot = new Vector2(0f, 0.5f);
+            box.anchoredPosition = new Vector2(11f, 0f);
+            box.sizeDelta = new Vector2(20f, 20f);
+            Image boxImage = box.gameObject.AddComponent<Image>();
+            boxImage.color = FieldColor;
+            boxImage.raycastTarget = false;
+
+            RectTransform check = CreateRect(box, "Check");
+            Stretch(check, 4f, 4f, 4f, 4f);
+            Image checkImage = check.gameObject.AddComponent<Image>();
+            checkImage.color = SecondaryAccentColor;
+            checkImage.raycastTarget = false;
+            toggle.graphic = checkImage;
+
+            label = CreateText(rect, labelValue, 12, FontStyle.Bold, TextColor, TextAnchor.MiddleLeft);
+            label.raycastTarget = false;
+            Stretch(label.rectTransform, 42f, 4f, 8f, 4f);
+
+            toggle.SetIsOnWithoutNotify(initialValue);
+            toggle.onValueChanged.AddListener(value => onChanged?.Invoke(value));
+            return toggle;
         }
 
         private InputField CreateInput(Transform parent, string name, string value)
@@ -1050,6 +1448,28 @@ namespace ARCloset
                 Mathf.Clamp01(color.g * multiplier),
                 Mathf.Clamp01(color.b * multiplier),
                 color.a);
+        }
+
+        private static string ShortGarmentName(GarmentDefinition definition, int index)
+        {
+            if (definition == null || string.IsNullOrWhiteSpace(definition.displayName))
+            {
+                return $"Garment {index + 1}";
+            }
+
+            string name = definition.displayName.Replace("MakeHuman ", string.Empty);
+            return name.Replace("Fisherman Sweater", "Sweater");
+        }
+
+        private static string ShortCameraName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || string.Equals(name, "default", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Default camera";
+            }
+
+            const int maxLength = 24;
+            return name.Length <= maxLength ? name : name.Substring(0, maxLength - 3) + "...";
         }
 
         private static bool TryParseHexColor(string code, out Color color)

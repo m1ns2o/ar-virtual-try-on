@@ -20,7 +20,7 @@ namespace ARCloset
         [SerializeField] private bool writeCsv = true;
         [SerializeField] private string outputDirectory = "PoseValidation";
         [SerializeField] private bool logPassingWindows = true;
-        [SerializeField] private bool showOverlay = true;
+        [SerializeField] private bool showOverlay;
 
         private bool isMonitoring;
         private StreamWriter csvWriter;

@@ -20,8 +20,8 @@ Use these as the first standardized examples:
 - MakeHuman Polo Shirt: upper-body garment
 - MakeHuman Fisherman Sweater: upper-body garment
 - MakeHuman Wool Pants: lower-body garment
-- MakeHuman Shift Dress: one-piece garment sourced from the MakeHuman Community `dress01` CC0 pack
-- MakeHuman Kimono: outerwear garment
+- MakeHuman Short-Sleeve Flapper Dress: modest one-piece garment from the MakeHuman Community `dress01` CC0 pack
+- MakeHuman High-Neck Short-Sleeve Dress: knee-length one-piece garment by Elvaerwyn, licensed CC-BY
 
 The menu item `AR Closet/Create Demo Scene` creates a simple mannequin and MakeHuman garment prefabs for the catalog.
 

@@ -14,7 +14,7 @@ namespace ARCloset
         [SerializeField] private string fileNamePrefix = "pose-trace";
         [SerializeField] private bool onlyRecordFreshPose = true;
         [SerializeField] private bool onlyRecordNewSequence = true;
-        [SerializeField] private bool showOverlay = true;
+        [SerializeField] private bool showOverlay;
 
         private StreamWriter writer;
         private int lastRecordedSequence = -1;

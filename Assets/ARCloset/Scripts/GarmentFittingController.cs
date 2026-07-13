@@ -504,7 +504,8 @@ namespace ARCloset
                     }
                     case GarmentSlot.OnePiece:
                     {
-                        float shoulderY = maxY - height * 0.20f;
+                        // Dress shoulder seams sit close to the top, below collars and sleeve caps.
+                        float shoulderY = maxY - height * 0.08f;
                         return new GarmentFitFrame
                         {
                             Bounds = bounds,
@@ -515,7 +516,7 @@ namespace ARCloset
                     }
                     case GarmentSlot.Outerwear:
                     {
-                        float shoulderY = maxY - height * 0.23f;
+                        float shoulderY = maxY - height * 0.18f;
                         return new GarmentFitFrame
                         {
                             Bounds = bounds,
@@ -527,7 +528,10 @@ namespace ARCloset
                     case GarmentSlot.Upper:
                     default:
                     {
-                        float shoulderY = maxY - height * 0.24f;
+                        // A fitted polo reaches its seam around 12% below max Y, while
+                        // wide-sleeve knits reach it around 18%. Aspect separates both.
+                        float shoulderInset = Mathf.Lerp(0.12f, 0.18f, Mathf.InverseLerp(1.10f, 1.75f, aspect));
+                        float shoulderY = maxY - height * shoulderInset;
                         return new GarmentFitFrame
                         {
                             Bounds = bounds,
