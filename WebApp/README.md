@@ -53,7 +53,13 @@ WASM 런타임을 로컬 정적 자산으로 복사합니다.
 - Vercel: Root Directory를 `WebApp`으로 지정하면 `vercel.json`을 사용합니다.
 
 양쪽 모두 `npm run build`와 `dist`를 사용하며, SPA fallback, 카메라 권한 보안 헤더,
-WASM/모델/GLB/텍스처 장기 캐시가 설정되어 있습니다.
+WASM/모델/GLB/텍스처 재검증 캐시가 설정되어 있습니다. 파일명이 해시된 Vite
+assets 디렉터리만 장기 불변 캐시를 사용하므로 모델을 교체해도 이전 의상이 남지
+않습니다.
+
+GitHub Actions는 웹 소스가 바뀐 pull request와 main push에서 단위 테스트와
+프로덕션 빌드를 실행합니다. 카탈로그 테스트는 Unity와 웹의 의상 ID, 슬롯, 출처,
+위치 및 피팅 배율을 대조해 두 버전의 설정 드리프트를 막습니다.
 
 ## 라이선스
 

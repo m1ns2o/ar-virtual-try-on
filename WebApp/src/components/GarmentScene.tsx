@@ -5,7 +5,7 @@ import {
   BufferAttribute,
   CanvasTexture,
   Color,
-  DoubleSide,
+  FrontSide,
   Group,
   LinearFilter,
   MathUtils,
@@ -74,14 +74,21 @@ function materialClone(source: Mesh["material"]): MeshStandardMaterial[] {
   return sources.map((material) => {
     if (material instanceof MeshStandardMaterial) {
       const clone = material.clone();
-      clone.side = DoubleSide;
-      clone.transparent = true;
-      clone.opacity = 0.96;
+      clone.side = FrontSide;
+      clone.transparent = false;
+      clone.opacity = 1;
+      clone.depthWrite = true;
       clone.metalness = 0.02;
       clone.roughness = 0.78;
       return clone;
     }
-    return new MeshStandardMaterial({ side: DoubleSide, transparent: true, opacity: 0.96, roughness: 0.78 });
+    return new MeshStandardMaterial({
+      side: FrontSide,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
+      roughness: 0.78,
+    });
   });
 }
 
@@ -234,8 +241,6 @@ function GarmentActor({ loaded, appearance, fit }: { loaded: LoadedGarment; appe
       const position = binding.geometry.getAttribute("position") as BufferAttribute;
       (position.array as Float32Array).set(binding.output);
       position.needsUpdate = true;
-      binding.geometry.computeVertexNormals();
-      binding.geometry.computeBoundingSphere();
     }
   }, [fit, loaded]);
 
@@ -290,7 +295,8 @@ export function GarmentScene(props: Props) {
       className="garment-canvas"
       orthographic
       camera={{ position: [0, 0, 10], zoom: 100, near: 0.01, far: 100 }}
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
+      frameloop={props.fit ? "always" : "demand"}
       gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
       onCreated={({ gl, scene }) => {
         gl.setClearColor(background, 0);
@@ -298,9 +304,9 @@ export function GarmentScene(props: Props) {
         scene.background = null;
       }}
     >
-      <ambientLight intensity={1.9} />
-      <directionalLight position={[1.5, 2.8, 5]} intensity={3.2} />
-      <directionalLight position={[-2, 0.5, 3]} intensity={1.1} color="#d9f4e6" />
+      <ambientLight intensity={1.35} />
+      <directionalLight position={[1.5, 2.8, 5]} intensity={2.4} />
+      <directionalLight position={[-2, 0.5, 3]} intensity={0.7} color="#d9f4e6" />
       {loaded ? <GarmentActor loaded={loaded} appearance={props.appearance} fit={props.fit} /> : null}
     </Canvas>
   );

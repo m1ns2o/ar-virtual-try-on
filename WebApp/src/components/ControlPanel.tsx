@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 
 import { ko } from "../i18n/ko";
 import { normalizeHex } from "../lib/color";
@@ -16,7 +16,7 @@ interface Props {
   onReset: () => void;
 }
 
-export function ControlPanel({
+export const ControlPanel = memo(function ControlPanel({
   selected,
   appearance,
   recentColors,
@@ -174,4 +174,4 @@ export function ControlPanel({
       </div>
     </aside>
   );
-}
+});

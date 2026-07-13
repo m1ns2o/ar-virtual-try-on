@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { POSE_INDEX, type FilteredLandmark } from "../types/pose";
 
@@ -24,22 +24,47 @@ const CONNECTIONS: Array<[number, number]> = [
 
 export function PoseOverlay({ points, visible }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0, ratio: 1 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.max(1, Math.round(rect.width * ratio));
-    canvas.height = Math.max(1, Math.round(rect.height * ratio));
+    const updateSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.round(rect.width));
+      const height = Math.max(1, Math.round(rect.height));
+      const backingWidth = Math.max(1, Math.round(width * ratio));
+      const backingHeight = Math.max(1, Math.round(height * ratio));
+      if (canvas.width !== backingWidth) canvas.width = backingWidth;
+      if (canvas.height !== backingHeight) canvas.height = backingHeight;
+      setSize((current) =>
+        current.width === width && current.height === height && current.ratio === ratio
+          ? current
+          : { width, height, ratio },
+      );
+    };
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(canvas);
+    window.addEventListener("resize", updateSize);
+    updateSize();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateSize);
+    };
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || size.width === 0 || size.height === 0) return;
     const context = canvas.getContext("2d");
     if (!context) return;
-    context.scale(ratio, ratio);
-    context.clearRect(0, 0, rect.width, rect.height);
+    context.setTransform(size.ratio, 0, 0, size.ratio, 0, 0);
+    context.clearRect(0, 0, size.width, size.height);
     if (!visible) return;
     const toCanvas = (point: FilteredLandmark) => ({
-      x: ((point.x + 1) * 0.5) * rect.width,
-      y: ((1 - point.y) * 0.5) * rect.height,
+      x: ((point.x + 1) * 0.5) * size.width,
+      y: ((1 - point.y) * 0.5) * size.height,
     });
 
     context.lineCap = "round";
@@ -66,7 +91,7 @@ export function PoseOverlay({ points, visible }: Props) {
       context.arc(position.x, position.y, 2.8, 0, Math.PI * 2);
       context.fill();
     }
-  }, [points, visible]);
+  }, [points, size, visible]);
 
   return <canvas ref={canvasRef} className="pose-overlay" aria-hidden="true" />;
 }

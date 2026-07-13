@@ -252,6 +252,7 @@ export function usePoseTracker({ videoRef, stageRef, definition }: Options) {
     let interval = device.interval;
     let longEdge = device.longEdge;
     let durationEma = 0;
+    let fastFrames = 0;
     let fpsWindowStarted = performance.now();
     let fpsFrames = 0;
     let measuredFps = 0;
@@ -300,19 +301,27 @@ export function usePoseTracker({ videoRef, stageRef, definition }: Options) {
 
     const infer = (now: number) => {
       if (sessionRef.current !== session || !landmarkerRef.current) return;
+      if (document.visibilityState !== "visible") {
+        rafRef.current = requestAnimationFrame(infer);
+        return;
+      }
       if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || now - lastInferenceAt < interval) {
         rafRef.current = requestAnimationFrame(infer);
         return;
       }
       lastInferenceAt = now;
       const aspect = Math.max(0.1, video.videoWidth / Math.max(1, video.videoHeight));
+      let inferenceWidth: number;
+      let inferenceHeight: number;
       if (aspect >= 1) {
-        inferenceCanvas.width = longEdge;
-        inferenceCanvas.height = Math.max(1, Math.round(longEdge / aspect));
+        inferenceWidth = longEdge;
+        inferenceHeight = Math.max(1, Math.round(longEdge / aspect));
       } else {
-        inferenceCanvas.height = longEdge;
-        inferenceCanvas.width = Math.max(1, Math.round(longEdge * aspect));
+        inferenceHeight = longEdge;
+        inferenceWidth = Math.max(1, Math.round(longEdge * aspect));
       }
+      if (inferenceCanvas.width !== inferenceWidth) inferenceCanvas.width = inferenceWidth;
+      if (inferenceCanvas.height !== inferenceHeight) inferenceCanvas.height = inferenceHeight;
       context.drawImage(video, 0, 0, inferenceCanvas.width, inferenceCanvas.height);
       const startedAt = performance.now();
       try {
@@ -325,9 +334,25 @@ export function usePoseTracker({ videoRef, stageRef, definition }: Options) {
       if (durationEma > 58) {
         longEdge = 256;
         interval = 67;
+        fastFrames = 0;
       } else if (durationEma > 38) {
         longEdge = Math.min(longEdge, 288);
         interval = 50;
+        fastFrames = 0;
+      } else if (durationEma < 28) {
+        fastFrames += 1;
+        if (fastFrames >= 90) {
+          if (longEdge < 288) {
+            longEdge = Math.min(device.longEdge, 288);
+            interval = Math.max(device.interval, 50);
+          } else {
+            longEdge = device.longEdge;
+            interval = device.interval;
+          }
+          fastFrames = 0;
+        }
+      } else {
+        fastFrames = 0;
       }
       rafRef.current = requestAnimationFrame(infer);
     };

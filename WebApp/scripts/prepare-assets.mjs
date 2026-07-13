@@ -112,7 +112,7 @@ for (const garment of garments) {
   const glb = await obj2gltf(source, {
     binary: true,
     secure: true,
-    doubleSidedMaterial: true,
+    doubleSidedMaterial: false,
     inputUpAxis: "Y",
     outputUpAxis: "Y",
   });

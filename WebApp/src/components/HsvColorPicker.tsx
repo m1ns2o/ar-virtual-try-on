@@ -89,8 +89,12 @@ export function HsvColorPicker({ color, label, onChange, onCommit }: Props) {
           value={Math.round(hsv.h * 360)}
           aria-label={`${label} 색상`}
           onChange={(event) => emit({ ...hsv, h: Number(event.target.value) / 360 })}
-          onPointerUp={() => onCommit(color)}
-          onKeyUp={() => onCommit(color)}
+          onPointerUp={(event) =>
+            emit({ ...hsv, h: Number(event.currentTarget.value) / 360 }, true)
+          }
+          onKeyUp={(event) =>
+            emit({ ...hsv, h: Number(event.currentTarget.value) / 360 }, true)
+          }
         />
       </label>
     </div>

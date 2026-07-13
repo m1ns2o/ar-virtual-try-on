@@ -16,6 +16,7 @@ function readGlbJson(path: string) {
   expect(jsonType).toBe("JSON");
   return JSON.parse(buffer.toString("utf8", 20, 20 + jsonLength).trim()) as {
     extensionsUsed?: string[];
+    materials?: Array<{ doubleSided?: boolean }>;
     meshes: Array<{ primitives: Array<{ attributes: Record<string, number> }> }>;
   };
 }
@@ -27,6 +28,8 @@ describe("prepared web assets", () => {
       expect(existsSync(path), garment.id).toBe(true);
       const gltf = readGlbJson(path);
       expect(gltf.extensionsUsed).toContain("EXT_meshopt_compression");
+      expect(gltf.materials?.length ?? 0).toBeGreaterThan(0);
+      expect(gltf.materials?.every((material) => material.doubleSided !== true)).toBe(true);
       const attributes = gltf.meshes.flatMap((mesh) => mesh.primitives.map((primitive) => primitive.attributes));
       expect(attributes.some((value) => "POSITION" in value)).toBe(true);
       expect(attributes.some((value) => "NORMAL" in value)).toBe(true);

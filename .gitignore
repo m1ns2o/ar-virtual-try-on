@@ -46,3 +46,6 @@ Packages/LocalTarballs/
 
 # Local Netlify folder
 .netlify
+
+# Local web development output
+WebApp/vite-localhost*.log

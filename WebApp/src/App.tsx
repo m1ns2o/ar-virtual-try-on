@@ -8,7 +8,7 @@ import { usePoseTracker } from "./hooks/usePoseTracker";
 import { ko } from "./i18n/ko";
 import { captureTryOn, saveCapture } from "./lib/capture";
 import { createDebugPoseFrame } from "./lib/debugPose";
-import type { GarmentAppearance, PoseFrame } from "./types/pose";
+import type { GarmentAppearance, GarmentDefinition, PoseFrame } from "./types/pose";
 
 const APPEARANCE_KEY = "ibobom-appearances-v2";
 const RECENT_KEY = "ibobom-recent-colors-v1";
@@ -59,10 +59,24 @@ export function App() {
   const visiblePhase = debugFrame ? "running" : tracker.phase;
 
   useEffect(() => {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearances));
+    const timeout = window.setTimeout(() => {
+      try {
+        localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearances));
+      } catch {
+        // The fitting experience remains usable when storage is unavailable or full.
+      }
+    }, 180);
+    return () => window.clearTimeout(timeout);
   }, [appearances]);
   useEffect(() => {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentColors));
+    const timeout = window.setTimeout(() => {
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(recentColors));
+      } catch {
+        // The fitting experience remains usable when storage is unavailable or full.
+      }
+    }, 180);
+    return () => window.clearTimeout(timeout);
   }, [recentColors]);
   useEffect(() => {
     if (!toast) return;
@@ -70,17 +84,21 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
-  const updateAppearance = (next: GarmentAppearance) => {
+  const selectGarment = useCallback((garment: GarmentDefinition) => {
+    setSelectedId(garment.id);
+  }, []);
+
+  const updateAppearance = useCallback((next: GarmentAppearance) => {
     setAppearances((current) => ({ ...current, [selectedId]: next }));
-  };
+  }, [selectedId]);
 
-  const commitColor = (color: string) => {
+  const commitColor = useCallback((color: string) => {
     setRecentColors((current) => [color, ...current.filter((value) => value !== color)].slice(0, 5));
-  };
+  }, []);
 
-  const resetAppearance = () => {
+  const resetAppearance = useCallback(() => {
     setAppearances((current) => ({ ...current, [selectedId]: createDefaultAppearance(definition) }));
-  };
+  }, [definition, selectedId]);
 
   const handleCanvas = useCallback((canvas: HTMLCanvasElement) => {
     webglCanvasRef.current = canvas;
@@ -150,7 +168,7 @@ export function App() {
           selected={definition}
           appearance={appearance}
           recentColors={recentColors}
-          onSelect={(garment) => setSelectedId(garment.id)}
+          onSelect={selectGarment}
           onAppearanceChange={updateAppearance}
           onColorCommit={commitColor}
           onReset={resetAppearance}
