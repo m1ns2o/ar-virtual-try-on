@@ -1,0 +1,20 @@
+/*
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/garments/*
+  Cache-Control: public, max-age=31536000, immutable
+/textures/*
+  Cache-Control: public, max-age=31536000, immutable
+/models/*
+  Cache-Control: public, max-age=31536000, immutable
+/mediapipe/*
+  Cache-Control: public, max-age=31536000, immutable
+/mediapipe/wasm/*.wasm
+  Content-Type: application/wasm
+/garments/*.glb
+  Content-Type: model/gltf-binary

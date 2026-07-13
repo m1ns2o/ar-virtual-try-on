@@ -43,3 +43,6 @@ PoseValidation/
 
 # Redundant local package archives
 Packages/LocalTarballs/
+
+# Local Netlify folder
+.netlify
