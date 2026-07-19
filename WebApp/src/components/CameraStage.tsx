@@ -18,7 +18,6 @@ interface Props {
   definition: GarmentDefinition;
   appearance: GarmentAppearance;
   onStart: () => void;
-  onStop: () => void;
   onCanvas: (canvas: HTMLCanvasElement) => void;
   onGarmentLoading: (loading: boolean) => void;
   onGarmentError: () => void;
@@ -33,7 +32,6 @@ export function CameraStage({
   definition,
   appearance,
   onStart,
-  onStop,
   onCanvas,
   onGarmentLoading,
   onGarmentError,
@@ -78,45 +76,11 @@ export function CameraStage({
               <span>{ko.guide.body}</span>
             </div>
           )}
-          <button type="button" className="camera-stop" onClick={onStop} title={ko.camera.stop}>
-            <span aria-hidden="true">■</span>
-            {ko.camera.stop}
-          </button>
           <div className="local-performance" title="포즈 추론은 브라우저 안에서만 실행됩니다">
             LOCAL · {frame.inferenceFps > 0 ? `${Math.round(frame.inferenceFps)} FPS` : "준비 중"}
           </div>
         </>
       ) : null}
-
-      {phase === "idle" && (
-        <div className="onboarding-layer">
-          <div className="onboarding-card">
-            <span className="eyebrow">{ko.camera.eyebrow}</span>
-            <h1>
-              {ko.camera.title.split("\n").map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </h1>
-            <p>{ko.camera.description}</p>
-            <button type="button" className="primary-button" onClick={onStart}>
-              <span className="button-camera-icon" aria-hidden="true">●</span>
-              {ko.camera.start}
-            </button>
-            <div className="privacy-note">
-              <span className="privacy-mark" aria-hidden="true">✓</span>
-              <div>
-                <strong>{ko.privacyShort}</strong>
-                <small>{ko.camera.requirements}</small>
-              </div>
-            </div>
-          </div>
-          <div className="hero-orbit" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-        </div>
-      )}
 
       {(phase === "requesting" || phase === "loadingModel") && (
         <div className="system-layer" role="status" aria-live="polite">

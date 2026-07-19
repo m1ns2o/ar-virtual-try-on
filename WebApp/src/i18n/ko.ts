@@ -1,20 +1,11 @@
 export const ko = {
   appName: "가상 피팅",
-  appTagline: "카메라로 확인하는 3D 가상 피팅",
-  privacyShort: "영상은 기기 안에서만 처리됩니다",
   camera: {
-    eyebrow: "실시간 3D 가상 피팅",
-    title: "카메라 앞에서\n옷을 입어보세요.",
-    description:
-      "카메라 사용을 허용하고 전신이 보이도록 서면 선택한 옷이 움직임에 맞춰 표시됩니다.",
-    start: "카메라 켜기",
-    requirements: "HTTPS 또는 localhost · 최신 버전의 Chrome, Edge, Safari",
     permissionTitle: "카메라 권한 확인 중",
     permissionBody: "브라우저에서 카메라 사용을 허용해 주세요.",
     modelTitle: "가상 피팅 준비 중",
     modelBody: "포즈 인식 모델을 불러오고 있습니다.",
     retry: "다시 시도",
-    stop: "카메라 끄기",
   },
   status: {
     ready: "준비",

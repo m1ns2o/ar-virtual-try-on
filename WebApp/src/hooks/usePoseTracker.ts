@@ -126,15 +126,6 @@ export function usePoseTracker({ videoRef, stageRef, definition }: Options) {
     wasFittedRef.current = false;
   }, [videoRef]);
 
-  const stop = useCallback(() => {
-    sessionRef.current += 1;
-    startingRef.current = false;
-    release();
-    setErrorCode(null);
-    setPhase("idle");
-    setFrame(EMPTY_FRAME);
-  }, [release]);
-
   const start = useCallback(async () => {
     if (startingRef.current) return;
     startingRef.current = true;
@@ -367,5 +358,5 @@ export function usePoseTracker({ videoRef, stageRef, definition }: Options) {
     [release],
   );
 
-  return { phase, errorCode, frame, start, stop };
+  return { phase, errorCode, frame, start };
 }

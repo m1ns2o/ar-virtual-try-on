@@ -59,6 +59,12 @@ export function App() {
   const visiblePhase = debugFrame ? "running" : tracker.phase;
 
   useEffect(() => {
+    if (debugPose) return;
+    const timeout = window.setTimeout(() => void tracker.start(), 0);
+    return () => window.clearTimeout(timeout);
+  }, [debugPose, tracker.start]);
+
+  useEffect(() => {
     const timeout = window.setTimeout(() => {
       try {
         localStorage.setItem(APPEARANCE_KEY, JSON.stringify(appearances));
@@ -159,7 +165,6 @@ export function App() {
           definition={definition}
           appearance={appearance}
           onStart={tracker.start}
-          onStop={tracker.stop}
           onCanvas={handleCanvas}
           onGarmentLoading={handleGarmentLoading}
           onGarmentError={handleGarmentError}
