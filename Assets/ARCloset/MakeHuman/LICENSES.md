@@ -25,7 +25,7 @@ The original pack metadata is preserved in:
 - `Assets/ARCloset/MakeHuman/ShortSleeveQipao/westernized_quipoa.mhclo`
 - `Assets/ARCloset/MakeHuman/ShortSleeveQipao/westernized_quipoa.mhmat`
 
-The first four selected garments are CC0. The `westernized_quipoa` garment is
+The selected garments are CC0 except for `westernized_quipoa`. The `westernized_quipoa` garment is
 CC-BY and must retain attribution to Elvaerwyn when redistributed or shown in a
-published build. The former shift-dress and kimono source files remain archived
-in the project for rollback, but are no longer referenced by either catalog.
+published build. The shift dress is also exposed in the web catalog; its source
+pack and attribution are recorded in the Unity catalog asset.

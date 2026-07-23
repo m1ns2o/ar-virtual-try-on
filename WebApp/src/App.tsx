@@ -8,10 +8,19 @@ import { usePoseTracker } from "./hooks/usePoseTracker";
 import { ko } from "./i18n/ko";
 import { captureTryOn, saveCapture } from "./lib/capture";
 import { createDebugPoseFrame } from "./lib/debugPose";
+import { buildGarmentFit } from "./lib/fit";
 import type { GarmentAppearance, GarmentDefinition, PoseFrame } from "./types/pose";
 
 const APPEARANCE_KEY = "ibobom-appearances-v2";
 const RECENT_KEY = "ibobom-recent-colors-v1";
+type EditorSlot = "upper" | "lower";
+interface OutfitSelection { upperId: string; lowerId: string | null; }
+
+function firstGarment(...slots: GarmentDefinition["slot"][]) {
+  const garment = GARMENTS.find((item) => slots.includes(item.slot));
+  if (!garment) throw new Error("Required garment slot is missing.");
+  return garment.id;
+}
 
 function defaultAppearances(): Record<string, GarmentAppearance> {
   return Object.fromEntries(GARMENTS.map((garment) => [garment.id, createDefaultAppearance(garment)]));
@@ -21,7 +30,26 @@ function readAppearances(): Record<string, GarmentAppearance> {
   const defaults = defaultAppearances();
   try {
     const stored = JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? "{}") as Record<string, GarmentAppearance>;
-    for (const garment of GARMENTS) defaults[garment.id] = { ...defaults[garment.id], ...stored[garment.id] };
+    for (const garment of GARMENTS) {
+      const saved = stored[garment.id] as (Partial<GarmentAppearance> & {
+        stripeEnabled?: boolean;
+        stripeColor?: string;
+      }) | undefined;
+      if (!saved) continue;
+      const fallback = defaults[garment.id].stripeColors;
+      const stripeColors: GarmentAppearance["stripeColors"] = [
+        saved.stripeColors?.[0] ?? saved.stripeColor ?? fallback[0],
+        saved.stripeColors?.[1] ?? fallback[1],
+        saved.stripeColors?.[2] ?? fallback[2],
+      ];
+      defaults[garment.id] = {
+        ...defaults[garment.id],
+        ...saved,
+        stripeColors,
+        stripeColorCount: saved.stripeColorCount === 3 ? 3 : saved.stripeColorCount === 2 ? 2 : 1,
+        pattern: saved.pattern ?? (saved.stripeEnabled ? "stripes" : "none"),
+      };
+    }
   } catch {
     // Invalid local preferences are safely ignored.
   }
@@ -38,22 +66,35 @@ function readRecentColors(): string[] {
   return ["#D9E6DF", "#7B3032", "#C65F4C", "#4D5150", "#E8C59B"];
 }
 
+function runningFit(frame: PoseFrame, definition: GarmentDefinition, phase: string) {
+  return phase === "running" ? buildGarmentFit(frame.points, definition) : null;
+}
+
 export function App() {
   const stageRef = useRef<HTMLElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const webglCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [selectedId, setSelectedId] = useState(GARMENTS[0].id);
+  const [outfit, setOutfit] = useState<OutfitSelection>(() => ({
+    upperId: firstGarment("upper", "outerwear"),
+    lowerId: firstGarment("lower"),
+  }));
+  const [editorSlot, setEditorSlot] = useState<EditorSlot>("upper");
   const [appearances, setAppearances] = useState(readAppearances);
   const [recentColors, setRecentColors] = useState(readRecentColors);
   const [garmentLoading, setGarmentLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const activeGarments = useMemo(() => {
+    const upper = findGarment(outfit.upperId);
+    return upper.slot === "onePiece" || !outfit.lowerId ? [upper] : [upper, findGarment(outfit.lowerId)];
+  }, [outfit]);
+  const selectedId = editorSlot === "upper" ? outfit.upperId : outfit.lowerId ?? outfit.upperId;
   const definition = useMemo(() => findGarment(selectedId), [selectedId]);
   const appearance = appearances[selectedId] ?? createDefaultAppearance(definition);
-  const tracker = usePoseTracker({ videoRef, stageRef, definition });
+  const tracker = usePoseTracker({ videoRef, stageRef, definition: activeGarments[0] });
   const debugPose = import.meta.env.DEV && new URLSearchParams(window.location.search).get("debugPose") === "1";
   const debugFrame = useMemo<PoseFrame | null>(
-    () => (debugPose ? createDebugPoseFrame(definition) : null),
-    [debugPose, definition],
+    () => (debugPose ? createDebugPoseFrame(activeGarments[0]) : null),
+    [activeGarments, debugPose],
   );
   const visibleFrame = debugFrame ?? tracker.frame;
   const visiblePhase = debugFrame ? "running" : tracker.phase;
@@ -91,8 +132,15 @@ export function App() {
   }, [toast]);
 
   const selectGarment = useCallback((garment: GarmentDefinition) => {
-    setSelectedId(garment.id);
-  }, []);
+    if (garment.slot === "lower") {
+      const deselecting = outfit.lowerId === garment.id;
+      setOutfit((current) => ({ ...current, lowerId: deselecting ? null : garment.id }));
+      setEditorSlot(deselecting ? "upper" : "lower");
+    } else {
+      setOutfit((current) => ({ ...current, upperId: garment.id }));
+      setEditorSlot("upper");
+    }
+  }, [outfit.lowerId]);
 
   const updateAppearance = useCallback((next: GarmentAppearance) => {
     setAppearances((current) => ({ ...current, [selectedId]: next }));
@@ -162,18 +210,24 @@ export function App() {
           phase={visiblePhase}
           errorCode={tracker.errorCode}
           frame={visibleFrame}
-          definition={definition}
-          appearance={appearance}
+          garments={activeGarments.map((item) => ({
+            definition: item,
+            appearance: appearances[item.id] ?? createDefaultAppearance(item),
+            fit: runningFit(visibleFrame, item, visiblePhase),
+          }))}
           onStart={tracker.start}
           onCanvas={handleCanvas}
           onGarmentLoading={handleGarmentLoading}
           onGarmentError={handleGarmentError}
         />
         <ControlPanel
+          outfit={outfit}
+          editorSlot={editorSlot}
           selected={definition}
           appearance={appearance}
           recentColors={recentColors}
           onSelect={selectGarment}
+          onEditorSlotChange={setEditorSlot}
           onAppearanceChange={updateAppearance}
           onColorCommit={commitColor}
           onReset={resetAppearance}

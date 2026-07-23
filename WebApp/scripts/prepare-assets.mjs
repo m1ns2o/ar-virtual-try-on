@@ -101,6 +101,11 @@ const garments = [
     obj: "ShortSleeveQipao/westernized_quipoa.obj",
     textures: {},
   },
+  {
+    id: "mh-shift-dress",
+    obj: "ShiftDress/dress_shift.obj",
+    textures: { base: "ShiftDress/ShiftDress.png" },
+  },
 ];
 
 await mkdir(garmentOutput, { recursive: true });

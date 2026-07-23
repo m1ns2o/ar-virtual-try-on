@@ -26,9 +26,7 @@ import { buildGarmentModelFitFrame, type GarmentModelFitFrame } from "../lib/gar
 import type { GarmentAppearance, GarmentDefinition, GarmentFit } from "../types/pose";
 
 interface Props {
-  definition: GarmentDefinition;
-  appearance: GarmentAppearance;
-  fit: GarmentFit | null;
+  garments: Array<{ definition: GarmentDefinition; appearance: GarmentAppearance; fit: GarmentFit | null }>;
   onCanvas: (canvas: HTMLCanvasElement) => void;
   onLoadingChange: (loading: boolean) => void;
   onLoadError: () => void;
@@ -153,9 +151,43 @@ function patternTexture(appearance: GarmentAppearance): CanvasTexture {
   const context = canvas.getContext("2d")!;
   context.fillStyle = appearance.baseColor;
   context.fillRect(0, 0, 256, 256);
-  const stripe = Math.max(4, appearance.stripeWidth);
-  context.fillStyle = appearance.stripeColor;
-  for (let y = 0; y < 256; y += stripe * 2) context.fillRect(0, y, 256, stripe);
+  if (appearance.pattern === "stripes") {
+    const stripe = Math.max(4, appearance.stripeWidth);
+    const colors = [appearance.baseColor, ...appearance.stripeColors.slice(0, appearance.stripeColorCount)];
+    if (appearance.stripeDirection === "horizontal") {
+      for (let x = 0, index = 0; x < 256; x += stripe, index += 1) {
+        context.fillStyle = colors[index % colors.length];
+        context.fillRect(x, 0, stripe, 256);
+      }
+    } else if (appearance.stripeDirection === "diagonal") {
+      context.save();
+      context.translate(128, 128);
+      context.rotate(Math.PI / 4);
+      for (let y = -384, index = 0; y < 384; y += stripe, index += 1) {
+        context.fillStyle = colors[index % colors.length];
+        context.fillRect(-384, y, 768, stripe);
+      }
+      context.restore();
+    } else {
+      for (let y = 0, index = 0; y < 256; y += stripe, index += 1) {
+        context.fillStyle = colors[index % colors.length];
+        context.fillRect(0, y, 256, stripe);
+      }
+    }
+  } else if (appearance.pattern === "dots") {
+    context.fillStyle = appearance.stripeColors[0];
+    const radius = Math.max(3, appearance.dotSize) / 2;
+    const spacing = Math.max(12, appearance.dotSize * 2.1);
+    const rowSpacing = spacing * 0.86;
+    for (let y = rowSpacing / 2, row = 0; y < 256; y += rowSpacing, row += 1) {
+      const offset = row % 2 === 0 ? spacing / 2 : spacing;
+      for (let x = offset; x < 256; x += spacing) {
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+  }
   context.globalAlpha = 0.06;
   context.fillStyle = "#ffffff";
   for (let x = 0; x < 256; x += 4) context.fillRect(x, 0, 1, 256);
@@ -220,9 +252,9 @@ function GarmentActor({ loaded, appearance, fit }: { loaded: LoadedGarment; appe
 
   useEffect(() => {
     patternRef.current?.dispose();
-    patternRef.current = appearance.stripeEnabled ? patternTexture(appearance) : null;
+    patternRef.current = appearance.pattern === "none" ? null : patternTexture(appearance);
     loaded.materials.forEach((material) => {
-      material.color.set(appearance.stripeEnabled ? "#ffffff" : appearance.baseColor);
+      material.color.set(appearance.pattern === "none" ? appearance.baseColor : "#ffffff");
       material.map = patternRef.current ?? loaded.baseTexture;
       material.normalMap = loaded.normalTexture;
       material.roughnessMap = loaded.detailTexture;
@@ -287,8 +319,16 @@ function GarmentActor({ loaded, appearance, fit }: { loaded: LoadedGarment; appe
   );
 }
 
+function GarmentLayer({ garment, onLoadingChange, onLoadError }: {
+  garment: Props["garments"][number];
+  onLoadingChange: Props["onLoadingChange"];
+  onLoadError: Props["onLoadError"];
+}) {
+  const loaded = useLoadedGarment(garment.definition, onLoadingChange, onLoadError);
+  return loaded ? <GarmentActor loaded={loaded} appearance={garment.appearance} fit={garment.fit} /> : null;
+}
+
 export function GarmentScene(props: Props) {
-  const loaded = useLoadedGarment(props.definition, props.onLoadingChange, props.onLoadError);
   const background = useMemo(() => new Color("#000000"), []);
   return (
     <Canvas
@@ -296,7 +336,7 @@ export function GarmentScene(props: Props) {
       orthographic
       camera={{ position: [0, 0, 10], zoom: 100, near: 0.01, far: 100 }}
       dpr={[1, 1.5]}
-      frameloop={props.fit ? "always" : "demand"}
+      frameloop={props.garments.some((garment) => garment.fit) ? "always" : "demand"}
       gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
       onCreated={({ gl, scene }) => {
         gl.setClearColor(background, 0);
@@ -307,7 +347,14 @@ export function GarmentScene(props: Props) {
       <ambientLight intensity={1.35} />
       <directionalLight position={[1.5, 2.8, 5]} intensity={2.4} />
       <directionalLight position={[-2, 0.5, 3]} intensity={0.7} color="#d9f4e6" />
-      {loaded ? <GarmentActor loaded={loaded} appearance={props.appearance} fit={props.fit} /> : null}
+      {props.garments.map((garment) => (
+        <GarmentLayer
+          key={garment.definition.id}
+          garment={garment}
+          onLoadingChange={props.onLoadingChange}
+          onLoadError={props.onLoadError}
+        />
+      ))}
     </Canvas>
   );
 }

@@ -92,9 +92,12 @@ export interface PoseFrame {
 
 export interface GarmentAppearance {
   baseColor: string;
-  stripeColor: string;
-  stripeEnabled: boolean;
+  stripeColors: [string, string, string];
+  stripeColorCount: 1 | 2 | 3;
+  pattern: "none" | "stripes" | "dots";
   stripeWidth: number;
+  stripeDirection: "horizontal" | "vertical" | "diagonal";
+  dotSize: number;
 }
 
 export const POSE_INDEX = {

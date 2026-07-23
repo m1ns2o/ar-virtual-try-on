@@ -2,7 +2,7 @@ import { lazy, Suspense, type RefObject } from "react";
 
 import type { TrackerErrorCode, TrackerPhase } from "../hooks/usePoseTracker";
 import { ko } from "../i18n/ko";
-import type { GarmentAppearance, GarmentDefinition, PoseFrame } from "../types/pose";
+import type { GarmentAppearance, GarmentDefinition, GarmentFit, PoseFrame } from "../types/pose";
 import { PoseOverlay } from "./PoseOverlay";
 
 const GarmentScene = lazy(() =>
@@ -15,8 +15,7 @@ interface Props {
   phase: TrackerPhase;
   errorCode: TrackerErrorCode | null;
   frame: PoseFrame;
-  definition: GarmentDefinition;
-  appearance: GarmentAppearance;
+  garments: Array<{ definition: GarmentDefinition; appearance: GarmentAppearance; fit: GarmentFit | null }>;
   onStart: () => void;
   onCanvas: (canvas: HTMLCanvasElement) => void;
   onGarmentLoading: (loading: boolean) => void;
@@ -29,8 +28,7 @@ export function CameraStage({
   phase,
   errorCode,
   frame,
-  definition,
-  appearance,
+  garments,
   onStart,
   onCanvas,
   onGarmentLoading,
@@ -54,9 +52,7 @@ export function CameraStage({
       <PoseOverlay points={frame.points} visible={running} />
       <Suspense fallback={null}>
         <GarmentScene
-          definition={definition}
-          appearance={appearance}
-          fit={running ? frame.fit : null}
+          garments={garments}
           onCanvas={onCanvas}
           onLoadingChange={onGarmentLoading}
           onLoadError={onGarmentError}

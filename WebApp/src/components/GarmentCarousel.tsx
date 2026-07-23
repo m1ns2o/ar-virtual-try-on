@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import useEmblaCarousel from "embla-carousel-react";
 
-import { GARMENTS } from "../data/garments";
 import { ko } from "../i18n/ko";
 import { CarouselWheelGate } from "../lib/carouselWheel";
 import type { GarmentDefinition } from "../types/pose";
 
 interface Props {
-  selected: GarmentDefinition;
+  garments: GarmentDefinition[];
+  selected: GarmentDefinition | null;
   onSelect: (garment: GarmentDefinition) => void;
+  disabled?: boolean;
+  label: string;
 }
 
-export function GarmentCarousel({ selected, onSelect }: Props) {
+export function GarmentCarousel({ garments, selected, onSelect, disabled = false, label }: Props) {
   const [viewportRef, emblaApi] = useEmblaCarousel({
     align: "start",
     containScroll: "trimSnaps",
@@ -55,9 +57,9 @@ export function GarmentCarousel({ selected, onSelect }: Props) {
 
   useEffect(() => {
     if (!emblaApi) return;
-    const selectedIndex = GARMENTS.findIndex((garment) => garment.id === selected.id);
+    const selectedIndex = garments.findIndex((garment) => garment.id === selected?.id);
     if (selectedIndex >= 0) emblaApi.scrollTo(selectedIndex);
-  }, [emblaApi, selected.id]);
+  }, [emblaApi, garments, selected?.id]);
 
   useEffect(() => {
     const viewport = viewportNodeRef.current;
@@ -90,23 +92,24 @@ export function GarmentCarousel({ selected, onSelect }: Props) {
       data-testid="garment-carousel"
       role="region"
       aria-roledescription="carousel"
-      aria-labelledby="garment-title"
+      aria-label={label}
     >
       <div className="garment-carousel-viewport" ref={setViewportNode}>
         <div className="garment-carousel-track" id="garment-carousel-track">
-          {GARMENTS.map((garment, index) => (
+          {garments.map((garment, index) => (
             <div
               className="garment-carousel-slide"
               key={garment.id}
               role="group"
               aria-roledescription="slide"
-              aria-label={`${index + 1} / ${GARMENTS.length} · ${garment.displayName}`}
+              aria-label={`${index + 1} / ${garments.length} · ${garment.displayName}`}
             >
               <button
                 type="button"
                 data-testid={`garment-${garment.id}`}
-                aria-pressed={selected.id === garment.id}
-                className={`garment-card${selected.id === garment.id ? " selected" : ""}`}
+                aria-pressed={selected?.id === garment.id}
+                className={`garment-card${selected?.id === garment.id ? " selected" : ""}`}
+                disabled={disabled}
                 onClick={() => selectGarment(garment, index)}
                 title={`${garment.displayName} · ${garment.author}`}
               >

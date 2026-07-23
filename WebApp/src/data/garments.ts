@@ -112,14 +112,39 @@ export const GARMENTS: GarmentDefinition[] = [
     defaultBaseColor: "#9a7890",
     defaultStripeColor: "#ead7de",
   },
+  {
+    id: "mh-shift-dress",
+    displayName: "메이크휴먼 시프트 드레스",
+    shortName: "시프트 드레스",
+    slot: "onePiece",
+    author: "MargaretToigo",
+    license: "CC0",
+    sourceUrl: "https://static.makehumancommunity.org/assets/assetpacks/dress01.html",
+    modelPath: "/garments/mh-shift-dress.glb",
+    texturePath: "/textures/mh-shift-dress-base.webp",
+    positionOffset: [0, 0, 0],
+    rotationOffset: [0, 0, 0],
+    scaleOffset: [1, 1, 1],
+    fitAnchorOffset: { x: 0, y: 0 },
+    fitWidthMultiplier: 1.06,
+    fitHeightMultiplier: 1.05,
+    fitVerticalBias: 0.03,
+    heightBlend: 0.45,
+    silhouette: "dress",
+    defaultBaseColor: "#b28f72",
+    defaultStripeColor: "#fff0d2",
+  },
 ];
 
 export function createDefaultAppearance(definition: GarmentDefinition): GarmentAppearance {
   return {
     baseColor: definition.defaultBaseColor,
-    stripeColor: definition.defaultStripeColor,
-    stripeEnabled: false,
+    stripeColors: [definition.defaultStripeColor, "#e7b44a", "#6f8fb3"],
+    stripeColorCount: 1,
+    pattern: "none",
     stripeWidth: 28,
+    stripeDirection: "horizontal",
+    dotSize: 16,
   };
 }
 
